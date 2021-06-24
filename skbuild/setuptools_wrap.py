@@ -498,38 +498,62 @@ def setup(*args, **kw):  # noqa: C901
 
         (_, version, machine) = plat_name.split('-')
 
-        # The loop here allows for CMAKE_OSX_* command line arguments to overload
-        # values passed with either the ``--plat-name`` command-line argument
-        # or the ``cmake_args`` setup option.
-        for cmake_arg in cmake_args:
-            if 'CMAKE_OSX_DEPLOYMENT_TARGET' in cmake_arg:
-                version = cmake_arg.split('=')[1]
-            if 'CMAKE_OSX_ARCHITECTURES' in cmake_arg:
-                machine = cmake_arg.split('=')[1]
-                if set(machine.split(';')) == {'x86_64', 'arm64'}:
-                    machine = 'universal2'
+        if "PLATFORM" in os.environ:
+            platform=os.environ["PLATFORM"]
+        else:
+            platform="macosx"
+        
+        if platform == "macosx":
+            # The loop here allows for CMAKE_OSX_* command line arguments to overload
+            # values passed with either the ``--plat-name`` command-line argument
+            # or the ``cmake_args`` setup option.
+            for cmake_arg in cmake_args:
+                if 'CMAKE_OSX_DEPLOYMENT_TARGET' in cmake_arg:
+                    version = cmake_arg.split('=')[1]
+                if 'CMAKE_OSX_ARCHITECTURES' in cmake_arg:
+                    machine = cmake_arg.split('=')[1]
+                    if set(machine.split(';')) == {'x86_64', 'arm64'}:
+                        machine = 'universal2'
 
-        set_skbuild_plat_name("macosx-{}-{}".format(version, machine))
+            set_skbuild_plat_name("macosx-{}-{}".format(version, machine))
 
-        # Set platform env. variable so that commands (e.g. bdist_wheel)
-        # uses this information. The _PYTHON_HOST_PLATFORM env. variable is
-        # used in distutils.util.get_platform() function.
-        os.environ.setdefault('_PYTHON_HOST_PLATFORM', skbuild_plat_name())
+            # Set platform env. variable so that commands (e.g. bdist_wheel)
+            # uses this information. The _PYTHON_HOST_PLATFORM env. variable is
+            # used in distutils.util.get_platform() function.
+            os.environ.setdefault('_PYTHON_HOST_PLATFORM', skbuild_plat_name())
 
-        # Set CMAKE_OSX_DEPLOYMENT_TARGET and CMAKE_OSX_ARCHITECTURES if not already
-        # specified
-        (_, version, machine) = skbuild_plat_name().split('-')
-        if not cmaker.has_cmake_cache_arg(
-                cmake_args, 'CMAKE_OSX_DEPLOYMENT_TARGET'):
+            # Set CMAKE_OSX_DEPLOYMENT_TARGET and CMAKE_OSX_ARCHITECTURES if not already
+            # specified
+            (_, version, machine) = skbuild_plat_name().split('-')
+            if not cmaker.has_cmake_cache_arg(
+                    cmake_args, 'CMAKE_OSX_DEPLOYMENT_TARGET'):
+                cmake_args.append(
+                    '-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=%s' % version
+                )
+            if not cmaker.has_cmake_cache_arg(
+                    cmake_args, 'CMAKE_OSX_ARCHITECTURES'):
+                machine_archs = 'x86_64;arm64' if machine == 'universal2' else machine
+                cmake_args.append(
+                    '-DCMAKE_OSX_ARCHITECTURES:STRING=%s' % machine_archs
+                )
+        elif platform == "iphoneos":
+            # Get path from xcrun?
             cmake_args.append(
-                '-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=%s' % version
+                '-DCMAKE_OSX_SYSROOT:PATH=%s' % os.environ["IOS_SDKROOT"]
             )
-        if not cmaker.has_cmake_cache_arg(
-                cmake_args, 'CMAKE_OSX_ARCHITECTURES'):
-            machine_archs = 'x86_64;arm64' if machine == 'universal2' else machine
+            cmake_args.append("-DWITH_OPENCL=OFF")  # Disable OpenCL; it isn't compatible with iOS
+            cmake_args.append("-DHAVE_OPENCL=OFF")  # Disable OpenCL; it isn't compatible with iOS
+            cmake_args.append("-DIOS=1")  # Build the iOS codebase
+            cmake_args.append("-DCMAKE_CROSSCOMPILING=ON")
+        elif platform == "iphonesimulator":
             cmake_args.append(
-                '-DCMAKE_OSX_ARCHITECTURES:STRING=%s' % machine_archs
+                '-DCMAKE_OSX_SYSROOT:PATH=%s' % os.environ["SIM_SDKROOT"]
             )
+            cmake_args.append("-DWITH_OPENCL=OFF")  # Disable OpenCL; it isn't compatible with iOS
+            cmake_args.append("-DHAVE_OPENCL=OFF")  # Disable OpenCL; it isn't compatible with iOS
+            cmake_args.append("-DIOS=1")  # Build the iOS codebase
+            cmake_args.append("-DCMAKE_CROSSCOMPILING=ON")
+
 
     # Install cmake if listed in `setup_requires`
     for package in kw.get('setup_requires', []):

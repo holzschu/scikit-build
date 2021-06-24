@@ -20,22 +20,32 @@ def _default_skbuild_plat_name():
     On macOS, it corresponds to the version and machine associated with :func:`platform.mac_ver()`.
     """
     if sys.platform == 'darwin':
-        # If the MACOSX_DEPLOYMENT_TARGET environment variable is defined, use
-        # it, as it will be the most accurate. Otherwise use the value returned
-        # by platform.mac_ver() provided by the platform module available in
-        # the Python standard library.
-        #
-        # Note that on macOS, distutils.util.get_platform() is not used because
-        # it returns the macOS version on which Python was built which may be
-        # significantly older than the user's current machine.
-        release, _, machine = platform.mac_ver()
-        release = os.environ.get("MACOSX_DEPLOYMENT_TARGET", release)
-        split_ver = release.split('.')
-        machine = os.environ.get("CMAKE_OSX_ARCHITECTURES", machine)
-        # Handle universal2 wheels, if those two architectures are requested.
-        if set(machine.split(';')) == {'x86_64', 'arm64'}:
-            machine = 'universal2'
-        return 'macosx-{}.{}-{}'.format(split_ver[0], split_ver[1], machine)
+        if "PLATFORM" in os.environ:
+            localPlatform=os.environ["PLATFORM"]
+        else:
+            localPlatform="macosx"
+        
+        if localPlatform == "macosx":
+            # If the MACOSX_DEPLOYMENT_TARGET environment variable is defined, use
+            # it, as it will be the most accurate. Otherwise use the value returned
+            # by platform.mac_ver() provided by the platform module available in
+            # the Python standard library.
+            #
+            # Note that on macOS, distutils.util.get_platform() is not used because
+            # it returns the macOS version on which Python was built which may be
+            # significantly older than the user's current machine.
+            release, _, machine = platform.mac_ver()
+            release = os.environ.get("MACOSX_DEPLOYMENT_TARGET", release)
+            split_ver = release.split('.')
+            machine = os.environ.get("CMAKE_OSX_ARCHITECTURES", machine)
+            # Handle universal2 wheels, if those two architectures are requested.
+            if set(machine.split(';')) == {'x86_64', 'arm64'}:
+                machine = 'universal2'
+            return 'macosx-{}.{}-{}'.format(split_ver[0], split_ver[1], machine)
+        if localPlatform == "iphoneos":
+            return 'iphoneos-14.0-arm64'
+        if localPlatform == "iphonesimulator":
+            return 'iphonesimulator-14.0-x86_64'
     else:
         return get_platform()
 
