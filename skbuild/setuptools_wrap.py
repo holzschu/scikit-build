@@ -545,6 +545,7 @@ def setup(*args, **kw):  # noqa: C901
             cmake_args.append("-DHAVE_OPENCL=OFF")  # Disable OpenCL; it isn't compatible with iOS
             cmake_args.append("-DIOS=1")  # Build the iOS codebase
             cmake_args.append("-DCMAKE_CROSSCOMPILING=ON")
+            cmake_args.append("-DWITH_LAPACK=ON")
         elif platform == "iphonesimulator":
             cmake_args.append(
                 '-DCMAKE_OSX_SYSROOT:PATH=%s' % os.environ["SIM_SDKROOT"]
