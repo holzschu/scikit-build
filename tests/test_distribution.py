@@ -1,24 +1,17 @@
-
 import os
-import pytest
 
+import pytest
 from path import Path
 
 from . import initialize_git_repo_and_commit, prepare_project
 
-DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../dist'))
+DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../dist"))
 
 # Test if package can be imported to allow testing on
 # conda-forge where ``pytest-virtualenv`` is not available.
-try:
-    import pytest_virtualenv  # noqa: F401
-    HAS_PYTEST_VIRTUALENV = True
-except ImportError:
-    HAS_PYTEST_VIRTUALENV = False
+pytest.importorskip("pytest_virtualenv", reason="pytest_virtualenv not available. See #228")
 
 
-@pytest.mark.skipif(not HAS_PYTEST_VIRTUALENV,
-                    reason="pytest_virtualenv not available. See #228")
 def test_source_distribution(virtualenv):
     sdists = Path(DIST_DIR).files(match="*.tar.gz") if Path(DIST_DIR).exists() else []
     if not sdists:
@@ -34,8 +27,6 @@ def test_source_distribution(virtualenv):
     virtualenv.run("python setup.py bdist_wheel")
 
 
-@pytest.mark.skipif(not HAS_PYTEST_VIRTUALENV,
-                    reason="pytest_virtualenv not available. See #228")
 def test_wheel(virtualenv):
     wheels = Path(DIST_DIR).files(match="*.whl") if Path(DIST_DIR).exists() else []
     if not wheels:

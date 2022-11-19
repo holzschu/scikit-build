@@ -2,6 +2,16 @@
 scikit-build
 ===============================
 
+.. image:: https://github.com/scikit-build/scikit-build/actions/workflows/ci.yml/badge.svg
+    :target: https://github.com/scikit-build/scikit-build/actions/workflows/ci.yml
+
+.. image:: https://dev.azure.com/scikit-build/scikit-build/_apis/build/status/scikit-build.scikit-build?branchName=master
+   :target: https://dev.azure.com/scikit-build/scikit-build/_build/latest?definitionId=1&branchName=master
+
+.. image:: https://codecov.io/gh/scikit-build/scikit-build/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/scikit-build/scikit-build
+    :alt: Code coverage status
+
 Improved build system generator for CPython C/C++/Fortran/Cython extensions.
 
 Better support is available for additional compilers, build systems, cross
@@ -9,7 +19,7 @@ compilation, and locating dependencies and determining their build
 requirements.
 
 The **scikit-build** package is fundamentally just glue between
-the `setuptools` Python module and `CMake <https://cmake.org/>`_.
+the ``setuptools`` Python module and `CMake <https://cmake.org/>`_.
 
 To get started, see `this example <https://scikit-build.readthedocs.io/en/latest/usage.html#example-of-setup-py-cmakelists-txt-and-pyproject-toml>`_ and `scikit-build-sample-projects <https://github.com/scikit-build/scikit-build-sample-projects>`_.
 
@@ -22,7 +32,7 @@ Latest Release
   +-----------------------------------------------------------------------------+-------------------------------------------------------------------------------+
   | Versions                                                                    | Downloads                                                                     |
   +=============================================================================+===============================================================================+
-  | .. image:: https://img.shields.io/pypi/v/scikit-build.svg                   | .. image:: https://img.shields.io/badge/downloads-660k%20total-green.svg      |
+  | .. image:: https://img.shields.io/pypi/v/scikit-build.svg                   | .. image:: https://img.shields.io/pypi/dm/scikit-build                        |
   |     :target: https://pypi.python.org/pypi/scikit-build                      |     :target: https://pypi.python.org/pypi/scikit-build                        |
   +-----------------------------------------------------------------------------+-------------------------------------------------------------------------------+
   | .. image:: https://anaconda.org/conda-forge/scikit-build/badges/version.svg | .. image:: https://anaconda.org/conda-forge/scikit-build/badges/downloads.svg |
@@ -30,34 +40,35 @@ Latest Release
   +-----------------------------------------------------------------------------+-------------------------------------------------------------------------------+
 
 
-Build Status
+
+Known Issues
 ------------
 
-.. table::
+These issues are likely to be addressed in upcoming releases.
 
-  +---------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-  |               | Linux                                                                                   | MacOSX                                                                                  | Windows                                                                                                   |
-  +===============+=========================================================================================+=========================================================================================+===========================================================================================================+
-  | PyPI          | .. image:: https://circleci.com/gh/scikit-build/scikit-build.svg?style=shield           | .. image:: https://img.shields.io/travis/scikit-build/scikit-build.svg?maxAge=2592000   | .. image:: https://ci.appveyor.com/api/projects/status/77bjtsihsjaywjr0?svg=true                          |
-  |               |     :target: https://circleci.com/gh/scikit-build/scikit-build                          |     :target: https://travis-ci.org/scikit-build/scikit-build                            |    :target: https://ci.appveyor.com/project/scikit-build/scikit-build/branch/master                       |
-  +---------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-  | Conda         | .. image:: https://circleci.com/gh/conda-forge/scikit-build-feedstock.svg?style=shield  | .. image:: https://travis-ci.org/conda-forge/scikit-build-feedstock.svg?branch=master   | .. image:: https://ci.appveyor.com/api/projects/status/github/conda-forge/scikit-build-feedstock?svg=True |
-  |               |     :target: https://circleci.com/gh/conda-forge/scikit-build-feedstock                 |     :target: https://travis-ci.org/conda-forge/scikit-build-feedstock                   |    :target: https://ci.appveyor.com/project/conda-forge/scikit-build-feedstock/branch/master              |
-  +---------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
+* Editable installs do not work with the latest versions of Setuptools (and had
+  issues with older versions, too).
+* Configuration scikit-build cares about _must_ be specified in ``setup()``
+  currently.
+* The cache directory (``_skbuild``) may need to be deleted between builds in
+  some cases (like rebuilding with a different Python interpreter).
 
-Overall Health
---------------
+We are also working on improving scikit-build, so there are some upcoming
+changes and deprecations:
 
-.. image:: https://requires.io/github/scikit-build/scikit-build/requirements.svg?branch=master
-    :target: https://requires.io/github/scikit-build/scikit-build/requirements/?branch=master
-    :alt: Requirements Status
 
-.. image:: https://codecov.io/gh/scikit-build/scikit-build/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/scikit-build/scikit-build
+* All deprecated setuptools/distutils features are also deprecated in
+  scikit-build, like the ``test`` command, ``easy_install``, etc.
+* Python 3.6
+  support is deprecated, as setuptools, pytest, and everything else we use has
+  dropped it already.
+* Older versions of CMake (<3.15) are not recommended; a future version will
+  remove support for older CMake's (along with providing a better mechanism for
+  ensuring a proper CMake is available).
+* Our primary branch will change to ``main``
 
-.. image:: https://landscape.io/github/scikit-build/scikit-build/master/landscape.svg?style=flat
-    :target: https://landscape.io/github/scikit-build/scikit-build
-    :alt: Code Health
+If you need any of these features, please open or find an issue explaining what
+and why you need something.
 
 Miscellaneous
 -------------
@@ -66,3 +77,6 @@ Miscellaneous
 * Documentation: http://scikit-build.readthedocs.org
 * Source code: https://github.com/scikit-build/scikit-build
 * Mailing list: https://groups.google.com/forum/#!forum/scikit-build
+
+
+Support for this work was provided by NSF cooperative agreement `OAC-2209877 <https://www.nsf.gov/awardsearch/showAward?AWD_ID=2209877>`_.

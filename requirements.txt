@@ -1,5 +1,5 @@
 distro
 packaging
-setuptools>=28.0.0;python_version>='3'
-setuptools>=28.0.0,<45;python_version<'3'
-wheel>=0.29.0
+setuptools>=42.0.0
+typing-extensions>=3.7; python_version < "3.8"
+wheel>=0.32.0

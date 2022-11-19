@@ -1,16 +1,9 @@
-include AUTHORS.rst
-include CONTRIBUTING.rst
-include HISTORY.rst
+include *.rst
 include LICENSE
-include README.rst
-include requirements.txt
-include requirements-dev.txt
-include skbuild/resources/cmake/*.cmake
+include requirements*.txt
+recursive-include skbuild *.cmake *.rst
 
-recursive-include tests *
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
+recursive-include tests *.py *.toml *.pyx *.txt *.in *.cxx dummy VERSION* README
+recursive-exclude * __pycache__ *.py[co] _skbuild *venv*
 
-recursive-include docs *.rst conf.py Makefile make.bat
-include versioneer.py
 include skbuild/_version.py

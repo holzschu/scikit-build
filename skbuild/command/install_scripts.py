@@ -1,20 +1,19 @@
 """This module defines custom implementation of ``install_scripts`` setuptools
 command."""
 
-from distutils import log as distutils_log
+from typing import Any
 
-from setuptools.command.install_scripts import (
-    install_scripts as _install_scripts)
+from setuptools.command.install_scripts import install_scripts as _install_scripts
 
-from . import set_build_base_mixin
-from ..utils import distribution_hide_listing, new_style
+from ..utils import distribution_hide_listing, distutils_log
+from . import CommandMixinProtocol, set_build_base_mixin
 
 
-class install_scripts(set_build_base_mixin, new_style(_install_scripts)):
+class install_scripts(set_build_base_mixin, _install_scripts):
     """Custom implementation of ``install_scripts`` setuptools command."""
 
-    def run(self, *args, **kwargs):
+    def run(self: CommandMixinProtocol, *args: Any, **kwargs: Any) -> None:
         """Handle --hide-listing option."""
         with distribution_hide_listing(self.distribution):
-            super(install_scripts, self).run(*args, **kwargs)
-        distutils_log.info("copied %d files" % len(self.outfiles))
+            super().run(*args, **kwargs)  # type: ignore[misc]
+        distutils_log.info("copied %d files", len(self.outfiles))

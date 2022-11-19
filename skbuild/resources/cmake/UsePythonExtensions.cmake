@@ -200,7 +200,7 @@ function(add_python_library _name)
         ARGS -h ${_name}.pyf -m ${_name} --overwrite-signature
              ${_sources_abs}
         DEPENDS ${_sources} ${_args_DEPENDS}
-        COMMENT "Generating ${_name} Fortan interface file"
+        COMMENT "Generating ${_name} Fortran interface file"
     )
     list(APPEND _sources ${_name}.pyf)
   endif()
@@ -258,11 +258,11 @@ function(add_python_library _name)
   endif()
 
   target_include_directories(${_name} PRIVATE ${_args_INCLUDE_DIRECTORIES})
-  target_link_libraries(${_name} ${_args_LINK_LIBRARIES})
+  target_link_libraries(${_name} ${SKBUILD_LINK_LIBRARIES_KEYWORD} ${_args_LINK_LIBRARIES})
 
   if(_has_f2py_targets)
     target_include_directories(${_name} PRIVATE ${F2PY_INCLUDE_DIRS})
-    target_link_libraries(${_name} ${F2PY_LIBRARIES})
+    target_link_libraries(${_name} ${SKBUILD_LINK_LIBRARIES_KEYWORD} ${F2PY_LIBRARIES})
   endif()
 
   if(_args_COMPILE_DEFINITIONS)

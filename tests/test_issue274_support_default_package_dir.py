@@ -1,7 +1,10 @@
-
 from . import (
-    _tmpdir, execute_setup_py, initialize_git_repo_and_commit,
-    prepare_project, project_setup_py_test, push_dir
+    _tmpdir,
+    execute_setup_py,
+    initialize_git_repo_and_commit,
+    prepare_project,
+    project_setup_py_test,
+    push_dir,
 )
 
 
@@ -13,7 +16,7 @@ def test_install_command():
 def test_test_command():
     with push_dir():
 
-        tmp_dir = _tmpdir('test_test_command')
+        tmp_dir = _tmpdir("test_test_command")
         project = "issue-274-support-default-package-dir"
         prepare_project(project, tmp_dir)
         initialize_git_repo_and_commit(tmp_dir, verbose=True)

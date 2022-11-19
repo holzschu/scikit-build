@@ -201,7 +201,7 @@
 #                            FORWARD_DECL_MODULES_VAR fdecl_module_list)
 #
 #    # module2 -- dynamically linked
-#    include_directories({Boost_INCLUDE_DIRS})
+#    include_directories(${Boost_INCLUDE_DIRS})
 #    add_library(module2 SHARED boost_module2.cxx)
 #    target_link_libraries(module2 ${Boost_LIBRARIES})
 #    python_extension_module(module2
@@ -282,17 +282,13 @@ for candidate in candidates:
         rel_result = rel_candidate
         break
 
-ext_suffix_var = 'SO'
-if sys.version_info[:2] >= (3, 5):
-    ext_suffix_var = 'EXT_SUFFIX'
-
 sys.stdout.write(\";\".join((
     os.sep,
     os.pathsep,
     sys.prefix,
     result,
     rel_result,
-    distutils.sysconfig.get_config_var(ext_suffix_var)
+    distutils.sysconfig.get_config_var('EXT_SUFFIX')
 )))
 ")
 
@@ -434,7 +430,7 @@ endfunction()
 
 function(python_standalone_executable _target)
   include_directories(${PYTHON_INCLUDE_DIRS})
-  target_link_libraries(${_target} ${PYTHON_LIBRARIES})
+  target_link_libraries(${_target} ${SKBUILD_LINK_LIBRARIES_KEYWORD} ${PYTHON_LIBRARIES})
 endfunction()
 
 function(python_modules_header _name)

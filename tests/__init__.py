@@ -1,35 +1,33 @@
-# -*- coding: utf-8 -*-
-
-import _pytest.tmpdir
-import distutils
-import os
-import os.path
-import pkg_resources
+import setuptools  # noqa: F401
 
 try:
-    import pathlib
+    import distutils.dir_util
+    import distutils.sysconfig
 except ImportError:
-    import pathlib2 as pathlib  # Python 2.7
+    import distutils  # Python < 3.10
 
-import py.path
+import functools
+import os
+import os.path
+import pathlib
 import re
-import requests
-import six
 import subprocess
 import sys
-
 from contextlib import contextmanager
-from mock import patch
+from unittest.mock import patch
 
-from skbuild.compat import which  # noqa: F401
-from skbuild.utils import push_dir
+import _pytest.tmpdir
+import pkg_resources
+import py.path
+import requests
+
 from skbuild.platform_specifics import get_platform
-
+from skbuild.utils import push_dir
 
 SAMPLES_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
-    'samples',
-    )
+    "samples",
+)
 
 
 @contextmanager
@@ -42,8 +40,7 @@ def push_argv(argv):
 
 @contextmanager
 def push_env(**kwargs):
-    """This context manager allow to set/unset environment variables.
-    """
+    """This context manager allow to set/unset environment variables."""
     saved_env = dict(os.environ)
     for var, value in kwargs.items():
         if value is not None:
@@ -89,18 +86,15 @@ def _tmpdir(basename):
         if user:
             # use a sub-directory in the temproot to speed-up
             # make_numbered_dir() call
-            rootdir = temproot.join('pytest-of-%s' % user)
+            rootdir = temproot.join("pytest-of-%s" % user)
         else:
             rootdir = temproot
 
         rootdir.ensure(dir=1)
-        basetemp = py.path.local.make_numbered_dir(prefix='pytest-',
-                                                   rootdir=rootdir)
+        basetemp = py.path.local.make_numbered_dir(prefix="pytest-", rootdir=rootdir)
 
     # Adapted from _pytest.tmpdir.TempdirFactory.mktemp
-    return py.path.local.make_numbered_dir(prefix=basename,
-                                           keep=0, rootdir=basetemp,
-                                           lock_timeout=None)
+    return py.path.local.make_numbered_dir(prefix=basename, keep=0, rootdir=basetemp, lock_timeout=None)
 
 
 def _copy(src, target):
@@ -121,7 +115,7 @@ def _copy(src, target):
         src.copy(target)
 
 
-def _copy_dir(target_dir, src_dir, on_duplicate='exception', keep_top_dir=False):
+def _copy_dir(target_dir, src_dir, on_duplicate="exception", keep_top_dir=False):
     """
     Copies all entries (files, dirs) from 'src_dir' to 'target_dir' taking
     into account the 'on_duplicate' option (which defines what should happen if
@@ -131,7 +125,7 @@ def _copy_dir(target_dir, src_dir, on_duplicate='exception', keep_top_dir=False)
     """
     src_files = []
 
-    if isinstance(src_dir, six.string_types):
+    if isinstance(src_dir, str):
         src_dir = py.path.local(src_dir)
 
     if keep_top_dir:
@@ -144,11 +138,11 @@ def _copy_dir(target_dir, src_dir, on_duplicate='exception', keep_top_dir=False)
 
     for entry in src_files:
         target_entry = target_dir / entry.basename
-        if not target_entry.exists() or on_duplicate == 'overwrite':
+        if not target_entry.exists() or on_duplicate == "overwrite":
             _copy(entry, target_dir)
-        elif on_duplicate == 'exception':
+        elif on_duplicate == "exception":
             raise ValueError(
-                "'%s' already exists (src %s)" % (
+                "'{}' already exists (src {})".format(
                     target_entry,
                     entry,
                 )
@@ -164,10 +158,10 @@ def initialize_git_repo_and_commit(project_dir, verbose=True):
     git repository with one commit containing all the directories and files
     is created.
     """
-    if isinstance(project_dir, six.string_types):
+    if isinstance(project_dir, str):
         project_dir = py.path.local(project_dir)
 
-    if project_dir.join('.git').exists():
+    if project_dir.join(".git").exists():
         return
 
     # If any, exclude virtualenv files
@@ -175,16 +169,15 @@ def initialize_git_repo_and_commit(project_dir, verbose=True):
 
     with push_dir(str(project_dir)):
         for cmd in [
-            ['git', 'init'],
-            ['git', 'config', 'user.name', 'scikit-build'],
-            ['git', 'config', 'user.email', 'test@test'],
-            ['git', 'config', 'commit.gpgsign', 'false'],
-            ['git', 'add', '-A'],
-            ['git', 'reset', '.gitignore'],
-            ['git', 'commit', '-m', 'Initial commit']
+            ["git", "init"],
+            ["git", "config", "user.name", "scikit-build"],
+            ["git", "config", "user.email", "test@test"],
+            ["git", "config", "commit.gpgsign", "false"],
+            ["git", "add", "-A"],
+            ["git", "reset", ".gitignore"],
+            ["git", "commit", "-m", "Initial commit"],
         ]:
-            do_call = (subprocess.check_call
-                       if verbose else subprocess.check_output)
+            do_call = subprocess.check_call if verbose else subprocess.check_output
             do_call(cmd)
 
 
@@ -198,7 +191,7 @@ def prepare_project(project, tmp_project_dir, force=False):
     Specifying ``force=True`` will copy the files even if ``tmp_project_dir``
     is not empty.
     """
-    if isinstance(tmp_project_dir, six.string_types):
+    if isinstance(tmp_project_dir, str):
         tmp_project_dir = py.path.local(tmp_project_dir)
 
     # Create project directory if it does not exist
@@ -223,8 +216,8 @@ def execute_setup_py(project_dir, setup_args, disable_languages_test=False):
 
     # Clear _PYTHON_HOST_PLATFORM to ensure value sets in skbuild.setuptools_wrap.setup() does not
     # influence other tests.
-    if '_PYTHON_HOST_PLATFORM' in os.environ:
-        del os.environ['_PYTHON_HOST_PLATFORM']
+    if "_PYTHON_HOST_PLATFORM" in os.environ:
+        del os.environ["_PYTHON_HOST_PLATFORM"]
 
     with push_dir(str(project_dir)), push_argv(["setup.py"] + setup_args), prepend_sys_path([str(project_dir)]):
 
@@ -232,7 +225,7 @@ def execute_setup_py(project_dir, setup_args, disable_languages_test=False):
         # See function "project_on_sys_path()" in setuptools.command.test
         pkg_resources._initialize_master_working_set()
 
-        with open("setup.py", "r") as fp:
+        with open("setup.py") as fp:
             setup_code = compile(fp.read(), "setup.py", mode="exec")
 
             if setup_code is not None:
@@ -245,27 +238,24 @@ def execute_setup_py(project_dir, setup_args, disable_languages_test=False):
                     def write_test_cmakelist_no_languages(_self, _languages):
                         original_write_test_cmakelist([])
 
-                    with patch.object(type(platform), 'write_test_cmakelist', new=write_test_cmakelist_no_languages):
-                        six.exec_(setup_code)
+                    with patch.object(type(platform), "write_test_cmakelist", new=write_test_cmakelist_no_languages):
+                        exec(setup_code)
 
                 else:
-                    six.exec_(setup_code)
+                    exec(setup_code)
 
         yield
 
 
 def project_setup_py_test(project, setup_args, tmp_dir=None, verbose_git=True, disable_languages_test=False):
-
     def dec(fun):
-
-        @six.wraps(fun)
+        @functools.wraps(fun)
         def wrapped(*iargs, **ikwargs):
 
             if wrapped.tmp_dir is None:
                 wrapped.tmp_dir = _tmpdir(fun.__name__)
                 prepare_project(wrapped.project, wrapped.tmp_dir)
-                initialize_git_repo_and_commit(
-                    wrapped.tmp_dir, verbose=wrapped.verbose_git)
+                initialize_git_repo_and_commit(wrapped.tmp_dir, verbose=wrapped.verbose_git)
 
             with execute_setup_py(wrapped.tmp_dir, wrapped.setup_args, disable_languages_test=disable_languages_test):
                 result2 = fun(*iargs, **ikwargs)
@@ -315,15 +305,10 @@ def is_site_reachable(url):
 
 
 def list_ancestors(path):
-    """Return logical ancestors of the path.
-    """
+    """Return logical ancestors of the path."""
     return [str(parent) for parent in pathlib.PurePosixPath(path).parents if str(parent) != "."]
 
 
 def get_ext_suffix():
-    """Return python extension suffix.
-    """
-    ext_suffix_var = 'SO'
-    if sys.version_info[:2] >= (3, 5):
-        ext_suffix_var = 'EXT_SUFFIX'
-    return distutils.sysconfig.get_config_var(ext_suffix_var)
+    """Return python extension suffix."""
+    return distutils.sysconfig.get_config_var("EXT_SUFFIX")

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """test_skbuild_variable
 ------------------------
@@ -19,6 +18,7 @@ def test_skbuild_variable_builds():
 # @project_setup_py_test("fail-unless-skbuild-set", ["test"], disable_languages_test=True)
 # def test_skbuild_variable_works():
 #     pass
+
 
 @project_setup_py_test("fail-unless-skbuild-set", ["sdist"], disable_languages_test=True)
 def test_skbuild_variable_sdist():

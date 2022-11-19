@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=42", "setuptools_scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools_scm]
+write_to = "skbuild/_version.py"
+
+
+[tool.check-manifest]
+ignore = [
+  "skbuild/_version.py",
+  "docs/**",
+  ".*",
+  "noxfile.py",
+  "azure-pipelines.yml",
+]
+
+
+[tool.black]
+line-length = 120
+
+
+[tool.isort]
+profile = "black"
+known_third_party = ["distutils"]
+force_to_top = ["setuptools"]
+
+
+[tool.mypy]
+files = ["skbuild"]
+python_version = "3.6"
+warn_unused_configs = true
+show_error_codes = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+  "wheel.*",
+  "setuptools.logging",
+  "setuptools.command.*",
+  "numpy",
+  "distro",
+]
+ignore_missing_imports = true
+
+[tool.pylint]
+master.py-version = "3.6"
+master.jobs = "0"
+reports.output-format = "colorized"
+similarities.ignore-imports = "yes"
+messages_control.enable = [
+  "useless-suppression",
+]
+messages_control.disable = [
+  "deprecated-module", # distutils usage
+  "fixme",
+  "invalid-name",
+  "line-too-long",
+  "missing-module-docstring",
+  "no-member",
+  "protected-access",
+  "too-few-public-methods",
+  "too-many-arguments",
+  "too-many-branches",
+  "too-many-locals",
+  "too-many-statements",
+  "ungrouped-imports",
+  "wrong-import-order",
+  "wrong-import-position",
+]
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--showlocals"]
+norecursedirs = ["_skbuild"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+  "ignore:setup.py install is deprecated:Warning",
+  "ignore:easy_install command is deprecated:Warning",
+  "ignore:.*ends with a trailing slash, which is not supported by setuptools:FutureWarning",
+  "ignore:Config variable 'Py_DEBUG' is unset:RuntimeWarning",
+  "ignore:Config variable 'WITH_PYMALLOC' is unset, Python ABI tag may be incorrect:RuntimeWarning",
+  'ignore:\s*Installing .* as data is deprecated:Warning',
+  "ignore:shell/Perl-style subs.* are deprecated:DeprecationWarning",
+]
+log_cli_level = "info"
+markers = [
+  "fortran: fortran testing",
+]

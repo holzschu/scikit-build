@@ -43,7 +43,7 @@
 # ``PY2 | PY3``
 #   Force compilation using either Python-2 or Python-3 syntax and code
 #   semantics.  By default, Python-2 syntax and semantics are used if the major
-#   version of Python found is 2.  Otherwise, Python-3 syntax and sematics are
+#   version of Python found is 2.  Otherwise, Python-3 syntax and semantics are
 #   used.
 #
 # ``OUTPUT_VAR <OutputVar>``
@@ -56,13 +56,13 @@
 # ``<OutputVar>``
 #   The path of the generated source file.
 #
-# Cache variables that effect the behavior include:
+# Cache variables that affect the behavior include:
 #
 # ``CYTHON_ANNOTATE``
-#   whether to create an annotated .html file when compiling
+#   Whether to create an annotated .html file when compiling.
 #
 # ``CYTHON_FLAGS``
-#   additional flags to pass to the Cython compiler
+#   Additional flags to pass to the Cython compiler.
 #
 # Example usage
 # ^^^^^^^^^^^^^
@@ -101,8 +101,6 @@ set(CYTHON_ANNOTATE OFF
 set(CYTHON_FLAGS "" CACHE STRING
     "Extra flags to the cython compiler.")
 mark_as_advanced(CYTHON_ANNOTATE CYTHON_FLAGS)
-
-find_package(PythonLibs REQUIRED)
 
 set(CYTHON_CXX_EXTENSION "cxx")
 set(CYTHON_C_EXTENSION "c")
@@ -145,12 +143,6 @@ function(add_cython_target _name)
     message(FATAL_ERROR "Either C or CXX must be enabled to use Cython")
   endif()
 
-  if("${PYTHONLIBS_VERSION_STRING}" MATCHES "^2.")
-    set(_input_syntax "PY2")
-  else()
-    set(_input_syntax "PY3")
-  endif()
-
   if(_args_EMBED_MAIN)
     set(_embed_main TRUE)
   endif()
@@ -162,6 +154,10 @@ function(add_cython_target _name)
   if(_args_CXX)
     set(_output_syntax "CXX")
   endif()
+
+  # Doesn't select an input syntax - Cython
+  # defaults to 2 for Cython 2 and 3 for Cython 3
+  set(_input_syntax "default")
 
   if(_args_PY2)
     set(_input_syntax "PY2")
@@ -330,19 +326,11 @@ function(add_cython_target _name)
     set(annotate_arg "--annotate")
   endif()
 
-  set(no_docstrings_arg "")
-  if(CMAKE_BUILD_TYPE STREQUAL "Release" OR
-     CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
-    set(no_docstrings_arg "--no-docstrings")
-  endif()
-
   set(cython_debug_arg "")
-  set(embed_pos_arg "")
   set(line_directives_arg "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR
      CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     set(cython_debug_arg "--gdb")
-    set(embed_pos_arg "--embed-positions")
     set(line_directives_arg "--line-directives")
   endif()
 
@@ -363,8 +351,7 @@ function(add_cython_target _name)
   add_custom_command(OUTPUT ${generated_file}
                      COMMAND ${CYTHON_EXECUTABLE}
                      ARGS ${cxx_arg} ${include_directory_arg} ${py_version_arg}
-                          ${embed_arg} ${annotate_arg} ${no_docstrings_arg}
-                          ${cython_debug_arg} ${embed_pos_arg}
+                          ${embed_arg} ${annotate_arg} ${cython_debug_arg}
                           ${line_directives_arg} ${CYTHON_FLAGS_LIST} ${pyx_location}
                           --output-file ${generated_file}
                      DEPENDS ${_source_file}
