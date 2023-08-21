@@ -51,9 +51,11 @@ class bdist_wheel(set_build_base_mixin, _bdist_wheel):  # type: ignore[misc]
     def finalize_options(self, *args, **kwargs):
         """Ensure MacOSX wheels include the expected platform information."""
         # pylint:disable=attribute-defined-outside-init,access-member-before-definition
+        import sys
         if sys.platform == 'darwin' and self.plat_name is None and self.distribution.has_ext_modules():
             # The default value is duplicated in setuptools_wrap
             # pylint:disable=access-member-before-definition
+            import os
             if "PLATFORM" in os.environ:
                 platform=os.environ["PLATFORM"]
             else:
