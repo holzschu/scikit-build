@@ -2,10 +2,10 @@
 distutils and setuptools commands.
 """
 
-from typing import List, Optional
+from __future__ import annotations
 
+from .._compat.typing import Protocol
 from ..constants import SETUPTOOLS_INSTALL_DIR
-from ..typing import Protocol
 from ..utils import Distribution
 
 
@@ -14,10 +14,11 @@ class CommandMixinProtocol(Protocol):
 
     build_base: str
     distribution: Distribution
-    outfiles: List[str]
-    install_lib: Optional[str]
+    outfiles: list[str]
+    install_lib: str | None
     install_platlib: str
 
+    # pylint: disable-next=missing-function-docstring
     def finalize_options(self, *args: object, **kwargs: object) -> None:
         ...
 
@@ -31,4 +32,4 @@ class set_build_base_mixin:
         if not build_base or build_base == "build":
             self.build_base = SETUPTOOLS_INSTALL_DIR()
 
-        super().finalize_options(*args, **kwargs)  # type: ignore[misc]
+        super().finalize_options(*args, **kwargs)

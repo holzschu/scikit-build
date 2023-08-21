@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-
 """test_utils
 ------------------------
 
 Tests for utils functions.
 """
+
+from __future__ import annotations
 
 import os
 
@@ -159,17 +159,17 @@ def test_push_env():
 
     assert "SKBUILD_NEW_VAR" not in os.environ
     assert "SKBUILD_ANOTHER_VAR" in os.environ
-    assert saved_env == os.environ
+    assert saved_env == dict(os.environ)
 
     # Trying to unset an unknown variable should be a no-op
     with push_env(SKBUILD_NOT_SET=None):
-        assert saved_env == os.environ
-    assert saved_env == os.environ
+        assert saved_env == dict(os.environ)
+    assert saved_env == dict(os.environ)
 
     # Calling without argument should be a no-op
     with push_env():
-        assert saved_env == os.environ
-    assert saved_env == os.environ
+        assert saved_env == dict(os.environ)
+    assert saved_env == dict(os.environ)
 
 
 def test_python_module_finder():
@@ -184,43 +184,43 @@ def test_python_module_finder():
 
 
 @pytest.mark.parametrize(
-    "input_path, expected_path",
-    (
+    ("input_path", "expected_path"),
+    [
         (None, None),
         ("", ""),
-        ("/bar/foo/baz", "{s}bar{s}foo{s}baz".format(s=os.sep)),
-        ("C:\\bar\\foo\\baz", "C:{s}bar{s}foo{s}baz".format(s=os.sep)),
-        ("C:\\bar/foo\\baz/", "C:{s}bar{s}foo{s}baz{s}".format(s=os.sep)),
-    ),
+        ("/bar/foo/baz", f"{os.sep}bar{os.sep}foo{os.sep}baz"),
+        ("C:\\bar\\foo\\baz", f"C:{os.sep}bar{os.sep}foo{os.sep}baz"),
+        ("C:\\bar/foo\\baz/", f"C:{os.sep}bar{os.sep}foo{os.sep}baz{os.sep}"),
+    ],
 )
 def test_to_platform_path(input_path, expected_path):
     assert to_platform_path(input_path) == expected_path
 
 
 @pytest.mark.parametrize(
-    "input_path, expected_path",
-    (
+    ("input_path", "expected_path"),
+    [
         (None, None),
         ("", ""),
         ("/bar/foo/baz", "/bar/foo/baz"),
         ("C:\\bar\\foo\\baz", "C:/bar/foo/baz"),
         ("C:\\bar/foo\\baz/", "C:/bar/foo/baz/"),
-    ),
+    ],
 )
 def test_to_unix_path(input_path, expected_path):
     assert to_unix_path(input_path) == expected_path
 
 
 @pytest.mark.parametrize(
-    "input_path, expected_ancestors",
-    (
+    ("input_path", "expected_ancestors"),
+    [
         ("", []),
         (".", []),
         ("part1/part2/part3/part4", ["part1/part2/part3", "part1/part2", "part1"]),
         ("part1\\part2\\part3\\part4", []),
         ("/part1/part2/part3/part4", ["/part1/part2/part3", "/part1/part2", "/part1", "/"]),
         ("C:/part1/part2/part3/part4", ["C:/part1/part2/part3", "C:/part1/part2", "C:/part1", "C:"]),
-    ),
+    ],
 )
 def test_list_ancestors(input_path, expected_ancestors):
     assert list_ancestors(input_path) == expected_ancestors

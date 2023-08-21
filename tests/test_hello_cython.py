@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-
 """test_hello_cython
 ----------------------------------
 
 Tries to build and test the `hello-cython` sample project.
 """
+
+from __future__ import annotations
 
 import glob
 
@@ -21,11 +21,6 @@ pytestmark = pytest.mark.filterwarnings(
 @project_setup_py_test("hello-cython", ["build"])
 def test_hello_cython_builds():
     pass
-
-
-# @project_setup_py_test("hello-cython", ["test"])
-# def test_hello_cython_works():
-#     pass
 
 
 @project_setup_py_test("hello-cython", ["sdist"])
@@ -53,7 +48,7 @@ def test_hello_cython_sdist():
 @project_setup_py_test("hello-cython", ["bdist_wheel"])
 def test_hello_cython_wheel():
     expected_content = [
-        "hello_cython/_hello%s" % get_ext_suffix(),
+        f"hello_cython/_hello{get_ext_suffix()}",
         "hello_cython/__init__.py",
         "hello_cython/__main__.py",
     ]

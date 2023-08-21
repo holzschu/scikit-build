@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-
 """test_cmaker
 ----------------------------------
 
 Tests for CMaker functionality.
 """
+
+from __future__ import annotations
 
 import os
 import re
@@ -85,11 +85,10 @@ def test_make_without_configure_fails(capfd):
     assert "Error: could not load cache" in err
 
 
-@pytest.mark.parametrize("configure_with_cmake_source_dir", (True, False))
+@pytest.mark.parametrize("configure_with_cmake_source_dir", [True, False])
 def test_make(configure_with_cmake_source_dir, capfd):
     tmp_dir = _tmpdir("test_make")
     with push_dir(str(tmp_dir)):
-
         src_dir = tmp_dir.ensure("SRC", dir=1)
         src_dir.join("CMakeLists.txt").write(
             textwrap.dedent(
@@ -111,7 +110,7 @@ def test_make(configure_with_cmake_source_dir, capfd):
             config_kwargs = {}
             if configure_with_cmake_source_dir:
                 config_kwargs["cmake_source_dir"] = str(src_dir)
-            env = cmkr.configure(**config_kwargs)
+            env = cmkr.configure(**config_kwargs)  # type: ignore[arg-type]
             cmkr.make(env=env)
 
         messages = ["Project has been installed"]
@@ -134,11 +133,10 @@ def test_make(configure_with_cmake_source_dir, capfd):
             assert message in out
 
 
-@pytest.mark.parametrize("install_target", ("", "install", "install-runtime", "nonexistant-install-target"))
+@pytest.mark.parametrize("install_target", ["", "install", "install-runtime", "nonexistant-install-target"])
 def test_make_with_install_target(install_target, capfd):
     tmp_dir = _tmpdir("test_make_with_install_target")
     with push_dir(str(tmp_dir)):
-
         tmp_dir.join("CMakeLists.txt").write(
             textwrap.dedent(
                 """
@@ -189,34 +187,6 @@ def test_make_with_install_target(install_target, capfd):
 def test_configure_with_cmake_args(capfd):
     tmp_dir = _tmpdir("test_configure_with_cmake_args")
     with push_dir(str(tmp_dir)):
-        unused_vars = [
-            "CMAKE_EXPECTED_BAR",
-            "CMAKE_EXPECTED_FOO",
-            "PYTHON_VERSION_STRING",
-            "SKBUILD",
-            "PYTHON_EXECUTABLE",
-            "PYTHON_INCLUDE_DIR",
-            "PYTHON_LIBRARY",
-        ]
-
-        for prefix in ["Python3", "Python"]:
-            unused_vars.extend(
-                [
-                    f"{prefix}_EXECUTABLE",
-                    f"{prefix}_ROOT_DIR",
-                    f"{prefix}_INCLUDE_DIR",
-                    f"{prefix}_FIND_IMPLEMENTATIONS",
-                    f"{prefix}_FIND_REGISTRY",
-                ]
-            )
-
-            try:
-                import numpy as np  # noqa: F401
-
-                unused_vars.append(prefix + "_NumPy_INCLUDE_DIRS")
-            except ImportError:
-                pass
-
         tmp_dir.join("CMakeLists.txt").write(
             textwrap.dedent(
                 """
@@ -224,12 +194,8 @@ def test_configure_with_cmake_args(capfd):
             project(foobar NONE)
             # Do not complain about missing arguments passed to the main
             # project
-            foreach(unused_var IN ITEMS
-            {}
-              )
-            endforeach()
             """
-            ).format("\n".join(f"  ${{{unused}}}" for unused in unused_vars))
+            )
         )
 
         with push_dir(str(tmp_dir)):

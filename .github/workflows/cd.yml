@@ -27,6 +27,9 @@ jobs:
 
   publish:
     needs: [dist]
+    environment: pypi
+    permissions:
+      id-token: write
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
 
@@ -36,6 +39,4 @@ jobs:
         name: artifact
         path: dist
 
-    - uses: pypa/gh-action-pypi-publish@v1.5.1
-      with:
-        password: ${{ secrets.pypi_password }}
+    - uses: pypa/gh-action-pypi-publish@release/v1

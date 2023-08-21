@@ -1,6 +1,8 @@
 """This module defines custom ``generate_source_manifest`` setuptools
 command."""
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -42,15 +44,16 @@ class generate_source_manifest(set_build_base_mixin, Command):
         )
 
         if do_generate:
-
             try:
                 with open("MANIFEST.in", "wb") as manifest_in_file:
                     # Since Git < 2.11 does not support --recurse-submodules option, fallback to
                     # regular listing.
                     try:
-                        cmd_out = subprocess.check_output(["git", "ls-files", "--recurse-submodules"])
+                        cmd_out = subprocess.run(
+                            ["git", "ls-files", "--recurse-submodules"], stdout=subprocess.PIPE, check=True
+                        ).stdout
                     except subprocess.CalledProcessError:
-                        cmd_out = subprocess.check_output(["git", "ls-files"])
+                        cmd_out = subprocess.run(["git", "ls-files"], stdout=subprocess.PIPE, check=True).stdout
                     git_files = [git_file.strip() for git_file in cmd_out.split(b"\n")]
                     manifest_text = b"\n".join([b"include %s" % git_file.strip() for git_file in git_files if git_file])
                     manifest_text += b"\nexclude MANIFEST.in"

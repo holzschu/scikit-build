@@ -1,6 +1,8 @@
 """This module defines custom implementation of ``install`` setuptools
 command."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from setuptools.command.install import install as _install
@@ -22,4 +24,4 @@ class install(set_build_base_mixin, _install):
             # pylint:disable=attribute-defined-outside-init
             self.install_lib = self.install_platlib
 
-        super().finalize_options(*args, **kwargs)  # type: ignore[misc]
+        super().finalize_options(*args, **kwargs)

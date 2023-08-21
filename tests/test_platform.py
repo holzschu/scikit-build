@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-
 """test_platform
 ----------------------------------
 
 Tests for platforms, to verify that CMake correctly does a test compilation.
 """
+
+from __future__ import annotations
 
 import os
 import platform
@@ -40,7 +40,6 @@ def test_write_compiler_test_file():
 
 
 def test_cxx_compiler():
-
     # Create a unique subdirectory 'foo' that is expected to be removed.
     test_build_folder = os.path.join(test_folder, "build", "foo")
     mkdir_p(test_build_folder)
@@ -62,7 +61,7 @@ def test_cxx_compiler():
 @pytest.mark.skipif(
     platform.system().lower() in ["darwin", "windows"], reason="no fortran compiler is available by default"
 )
-@pytest.mark.fortran
+@pytest.mark.fortran()
 def test_fortran_compiler():
     generator = skbuild_platform.get_best_generator(languages=["Fortran"])
     # TODO: this isn't a true unit test.  It depends on the test
@@ -83,7 +82,9 @@ def test_generator_cleanup():
     assert not os.path.exists(test_folder)
 
 
-@pytest.mark.parametrize("supported_platform", ["darwin", "freebsd", "openbsd", "linux", "windows", "os400", "cygwin"])
+@pytest.mark.parametrize(
+    "supported_platform", ["darwin", "freebsd", "openbsd", "linux", "windows", "os400", "cygwin", "sunos", "aix"]
+)
 def test_known_platform(supported_platform, mocker):
     mocker.patch("platform.system", return_value=supported_platform)
     platforms = {
@@ -94,8 +95,10 @@ def test_known_platform(supported_platform, mocker):
         "windows": "Windows",
         "os400": "BSD",
         "cygwin": "Cygwin",
+        "sunos": "SunOS",
+        "aix": "AIX",
     }
-    expected_platform_classname = "%sPlatform" % platforms[supported_platform]
+    expected_platform_classname = f"{platforms[supported_platform]}Platform"
     assert get_platform().__class__.__name__ == expected_platform_classname
 
 

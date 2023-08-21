@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import setuptools  # noqa: F401
 
 try:
@@ -17,7 +19,6 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import _pytest.tmpdir
-import pkg_resources
 import py.path
 import requests
 
@@ -28,6 +29,18 @@ SAMPLES_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "samples",
 )
+
+__all__ = [
+    "SAMPLES_DIR",
+    "execute_setup_py",
+    "get_cmakecache_variables",
+    "initialize_git_repo_and_commit",
+    "list_ancestors",
+    "prepare_project",
+    "project_setup_py_test",
+    "push_dir",
+    "push_env",
+]
 
 
 @contextmanager
@@ -49,7 +62,7 @@ def push_env(**kwargs):
             del os.environ[var]
     yield
     os.environ.clear()
-    for (saved_var, saved_value) in saved_env.items():
+    for saved_var, saved_value in saved_env.items():
         os.environ[saved_var] = saved_value
 
 
@@ -64,7 +77,7 @@ def prepend_sys_path(paths):
     sys.path = saved_paths
 
 
-def _tmpdir(basename):
+def _tmpdir(basename: str) -> py.path.local:
     """This function returns a temporary directory similar to the one
     returned by the ``tmpdir`` pytest fixture.
     The difference is that the `basetemp` is not configurable using
@@ -78,17 +91,14 @@ def _tmpdir(basename):
 
     # Adapted from _pytest.tmpdir.TempdirFactory.getbasetemp()
     try:
-        basetemp = _tmpdir._basetemp
+        basetemp = _tmpdir._basetemp  # type: ignore[attr-defined]
     except AttributeError:
         temproot = py.path.local.get_temproot()
         user = _pytest.tmpdir.get_user()
 
-        if user:
-            # use a sub-directory in the temproot to speed-up
-            # make_numbered_dir() call
-            rootdir = temproot.join("pytest-of-%s" % user)
-        else:
-            rootdir = temproot
+        # use a sub-directory in the temproot to speed-up
+        # make_numbered_dir() call
+        rootdir = temproot.join(f"pytest-of-{user}") if user else temproot
 
         rootdir.ensure(dir=1)
         basetemp = py.path.local.make_numbered_dir(prefix="pytest-", rootdir=rootdir)
@@ -105,7 +115,8 @@ def _copy(src, target):
     Copied from pytest-datafiles/pytest_datafiles.py (MIT License)
     """
     if not src.exists():
-        raise ValueError("'%s' does not exist!" % src)
+        msg = f"'{src}' does not exist!"
+        raise ValueError(msg)
 
     if src.isdir():
         src.copy(target / src.basename)
@@ -141,14 +152,8 @@ def _copy_dir(target_dir, src_dir, on_duplicate="exception", keep_top_dir=False)
         if not target_entry.exists() or on_duplicate == "overwrite":
             _copy(entry, target_dir)
         elif on_duplicate == "exception":
-            raise ValueError(
-                "'{}' already exists (src {})".format(
-                    target_entry,
-                    entry,
-                )
-            )
-        else:  # ignore
-            continue
+            msg = f"'{target_entry}' already exists (src {entry})"
+            raise ValueError(msg)
 
 
 def initialize_git_repo_and_commit(project_dir, verbose=True):
@@ -177,8 +182,7 @@ def initialize_git_repo_and_commit(project_dir, verbose=True):
             ["git", "reset", ".gitignore"],
             ["git", "commit", "-m", "Initial commit"],
         ]:
-            do_call = subprocess.check_call if verbose else subprocess.check_output
-            do_call(cmd)
+            subprocess.run(cmd, stdout=None if verbose else subprocess.PIPE)
 
 
 def prepare_project(project, tmp_project_dir, force=False):
@@ -212,26 +216,19 @@ def execute_setup_py(project_dir, setup_args, disable_languages_test=False):
     """
 
     # See https://stackoverflow.com/questions/9160227/dir-util-copy-tree-fails-after-shutil-rmtree
-    distutils.dir_util._path_created = {}
+    distutils.dir_util._path_created = {}  # type: ignore[attr-defined]
 
     # Clear _PYTHON_HOST_PLATFORM to ensure value sets in skbuild.setuptools_wrap.setup() does not
     # influence other tests.
     if "_PYTHON_HOST_PLATFORM" in os.environ:
         del os.environ["_PYTHON_HOST_PLATFORM"]
 
-    with push_dir(str(project_dir)), push_argv(["setup.py"] + setup_args), prepend_sys_path([str(project_dir)]):
-
-        # Restore master working set that is reset following call to "python setup.py test"
-        # See function "project_on_sys_path()" in setuptools.command.test
-        pkg_resources._initialize_master_working_set()
-
+    with push_dir(str(project_dir)), push_argv(["setup.py", *setup_args]), prepend_sys_path([str(project_dir)]):
         with open("setup.py") as fp:
             setup_code = compile(fp.read(), "setup.py", mode="exec")
 
             if setup_code is not None:
-
                 if disable_languages_test:
-
                     platform = get_platform()
                     original_write_test_cmakelist = platform.write_test_cmakelist
 
@@ -247,25 +244,26 @@ def execute_setup_py(project_dir, setup_args, disable_languages_test=False):
         yield
 
 
-def project_setup_py_test(project, setup_args, tmp_dir=None, verbose_git=True, disable_languages_test=False):
+def project_setup_py_test(project, setup_args, tmp_dir=None, verbose_git=True, disable_languages_test=False, ret=False):
     def dec(fun):
         @functools.wraps(fun)
         def wrapped(*iargs, **ikwargs):
+            if wrapped.tmp_dir is None:  # type: ignore[attr-defined]
+                wrapped.tmp_dir = _tmpdir(fun.__name__)  # type: ignore[attr-defined]
+                prepare_project(wrapped.project, wrapped.tmp_dir)  # type: ignore[attr-defined]
+                initialize_git_repo_and_commit(wrapped.tmp_dir, verbose=wrapped.verbose_git)  # type: ignore[attr-defined]
 
-            if wrapped.tmp_dir is None:
-                wrapped.tmp_dir = _tmpdir(fun.__name__)
-                prepare_project(wrapped.project, wrapped.tmp_dir)
-                initialize_git_repo_and_commit(wrapped.tmp_dir, verbose=wrapped.verbose_git)
-
-            with execute_setup_py(wrapped.tmp_dir, wrapped.setup_args, disable_languages_test=disable_languages_test):
+            with execute_setup_py(wrapped.tmp_dir, wrapped.setup_args, disable_languages_test=disable_languages_test):  # type: ignore[attr-defined]
                 result2 = fun(*iargs, **ikwargs)
 
-            return wrapped.tmp_dir, result2
+            if ret:
+                return wrapped.tmp_dir, result2  # type: ignore[attr-defined]
+            return None
 
-        wrapped.project = project
-        wrapped.setup_args = setup_args
-        wrapped.tmp_dir = tmp_dir
-        wrapped.verbose_git = verbose_git
+        wrapped.project = project  # type: ignore[attr-defined]
+        wrapped.setup_args = setup_args  # type: ignore[attr-defined]
+        wrapped.tmp_dir = tmp_dir  # type: ignore[attr-defined]
+        wrapped.verbose_git = verbose_git  # type: ignore[attr-defined]
 
         return wrapped
 
@@ -284,8 +282,8 @@ def get_cmakecache_variables(cmakecache):
     results = {}
     cache_entry_pattern = re.compile(r"^([\w\d_-]+):([\w]+)=")
     with open(cmakecache) as content:
-        for line in content.readlines():
-            line = line.strip()
+        for full_line in content.readlines():
+            line = full_line.strip()
             result = cache_entry_pattern.match(line)
             if result:
                 variable_name = result.group(1)

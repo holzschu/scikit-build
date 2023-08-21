@@ -1,53 +1,62 @@
 """This module defines functions generally useful in scikit-build."""
 
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
+import typing
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Iterable, Iterator, Mapping, NamedTuple, Sequence, TypeVar
 
 from distutils.command.build_py import build_py as distutils_build_py
 from distutils.errors import DistutilsTemplateError
 from distutils.filelist import FileList
 from distutils.text_file import TextFile
 
-distutils_log: logging.Logger
+from .._compat.typing import Protocol
+
+if typing.TYPE_CHECKING:
+    import setuptools._distutils.dist
+
+
+class CommonLog(Protocol):
+    """Protocol for loggers with an info method."""
+
+    # pylint: disable-next=missing-function-docstring
+    def info(self, __msg: str, *args: object) -> None:
+        ...
+
+
+logger: CommonLog
 
 try:
-    import setuptools.logging  # noqa: F401
+    import setuptools.logging
 
-    distutils_log = logging.getLogger("skbuild")
-    distutils_log.setLevel(logging.INFO)
+    skb_log = logging.getLogger("skbuild")
+    skb_log.setLevel(logging.INFO)
     logging_module = True
+    logger = skb_log
 
 except ImportError:
-    from distutils import log as distutils_log  # type: ignore[misc]
+    from distutils import log as distutils_log
 
+    logger = distutils_log
     logging_module = False
 
 
 class Distribution(NamedTuple):
+    """Distribution stand-in."""
+
     script_name: str
 
 
 def _log_warning(msg: str, *args: object) -> None:
     try:
         if logging_module:
-            distutils_log.warning(msg, *args)
+            skb_log.warning(msg, *args)
         else:
-            distutils_log.warn(msg, *args)  # pylint: disable=deprecated-method
+            distutils_log.warn(msg, *args)
     except ValueError:
         # Setuptools might disconnect the logger. That shouldn't be an error for a warning.
         print(msg % args, flush=True)
@@ -66,7 +75,7 @@ Self = TypeVar("Self", bound="push_dir")
 class push_dir(contextlib.ContextDecorator):
     """Context manager to change current directory."""
 
-    def __init__(self, directory: Optional[str] = None, make_directory: bool = False) -> None:
+    def __init__(self, directory: str | None = None, make_directory: bool = False) -> None:
         """
         :param directory:
           Path to set as current working directory. If ``None``
@@ -78,7 +87,7 @@ class push_dir(contextlib.ContextDecorator):
         super().__init__()
         self.directory = directory
         self.make_directory = make_directory
-        self.old_cwd: Optional[str] = None
+        self.old_cwd: str | None = None
 
     def __enter__(self: Self) -> Self:
         self.old_cwd = os.getcwd()
@@ -100,13 +109,15 @@ class PythonModuleFinder(distutils_build_py):
     provides a specialized version of ``find_all_modules()``.
     """
 
+    distribution: Distribution  # type: ignore[assignment]
+
     # pylint: disable-next=super-init-not-called
     def __init__(
         self,
         packages: Sequence[str],
         package_dir: Mapping[str, str],
         py_modules: Sequence[str],
-        alternative_build_base: Optional[str] = None,
+        alternative_build_base: str | None = None,
     ) -> None:
         """
         :param packages: List of packages to search.
@@ -121,7 +132,7 @@ class PythonModuleFinder(distutils_build_py):
 
         self.distribution = Distribution("setup.py")
 
-    def find_all_modules(self, project_dir: Optional[str] = None) -> List[Union[Any, Tuple[str, str, str]]]:
+    def find_all_modules(self, project_dir: str | None = None) -> list[Any | tuple[str, str, str]]:
         """Compute the list of all modules that would be built by
         project located in current directory, whether they are
         specified one-module-at-a-time ``py_modules`` or by whole
@@ -137,18 +148,18 @@ class PythonModuleFinder(distutils_build_py):
             # TODO: typestubs for distutils
             return super().find_all_modules()  # type: ignore[no-any-return, no-untyped-call]
 
-    def find_package_modules(self, package: str, package_dir: str) -> Iterable[Tuple[str, str, str]]:
+    def find_package_modules(self, package: str, package_dir: str) -> Iterable[tuple[str, str, str]]:
         """Temporally prepend the ``alternative_build_base`` to ``module_file``.
         Doing so will ensure modules can also be found in other location
         (e.g ``skbuild.constants.CMAKE_INSTALL_DIR``).
         """
-        if package_dir != "" and not os.path.exists(package_dir) and self.alternative_build_base is not None:
+        if package_dir and not os.path.exists(package_dir) and self.alternative_build_base is not None:
             package_dir = os.path.join(self.alternative_build_base, package_dir)
 
-        modules: Iterable[Tuple[str, str, str]] = super().find_package_modules(package, package_dir)  # type: ignore[no-untyped-call]
+        modules: Iterable[tuple[str, str, str]] = super().find_package_modules(package, package_dir)  # type: ignore[no-untyped-call]
 
         # Strip the alternative base from module_file
-        def _strip_directory(entry: Tuple[str, str, str]) -> Tuple[str, str, str]:
+        def _strip_directory(entry: tuple[str, str, str]) -> tuple[str, str, str]:
             module_file = entry[2]
             if self.alternative_build_base is not None and module_file.startswith(self.alternative_build_base):
                 module_file = module_file[len(self.alternative_build_base) + 1 :]
@@ -186,7 +197,9 @@ def to_unix_path(path: OptStr) -> OptStr:
 
 
 @contextmanager
-def distribution_hide_listing(distribution: Distribution) -> Iterator[Union[bool, int]]:
+def distribution_hide_listing(
+    distribution: setuptools._distutils.dist.Distribution | Distribution,
+) -> Iterator[bool | int]:
     """Given a ``distribution``, this context manager temporarily
     sets distutils threshold to WARN if ``--hide-listing`` argument
     was provided.
@@ -194,15 +207,17 @@ def distribution_hide_listing(distribution: Distribution) -> Iterator[Union[bool
     It yields True if ``--hide-listing`` argument was provided.
     """
 
-    hide_listing = hasattr(distribution, "hide_listing") and distribution.hide_listing  # type: ignore[attr-defined]
-
+    hide_listing = getattr(distribution, "hide_listing", False)
+    wheel_log = logging.getLogger("wheel")
+    root_log = logging.getLogger()  # setuptools 65.6+ needs this hidden too
     if logging_module:
-        # Setuptools 60.2+, will always be on Python 3.6+
-        old_level = distutils_log.getEffectiveLevel()
-        if hide_listing:
-            distutils_log.setLevel(logging.WARNING)
+        # Setuptools 60.2+, will always be on Python 3.7+
+        old_wheel_level = wheel_log.getEffectiveLevel()
+        old_root_level = root_log.getEffectiveLevel()
         try:
             if hide_listing:
+                wheel_log.setLevel(logging.WARNING)
+                root_log.setLevel(logging.WARNING)
                 # The classic logger doesn't respond to set_threshold anymore,
                 # but it does log info and above to stdout, so let's hide that
                 with open(os.devnull, "w", encoding="utf-8") as f, contextlib.redirect_stdout(f):
@@ -210,19 +225,21 @@ def distribution_hide_listing(distribution: Distribution) -> Iterator[Union[bool
             else:
                 yield hide_listing
         finally:
-            distutils_log.setLevel(old_level)
+            if hide_listing:
+                wheel_log.setLevel(old_wheel_level)
+                root_log.setLevel(old_root_level)
 
     else:
         old_threshold = distutils_log._global_log.threshold  # type: ignore[attr-defined]
         if hide_listing:
-            distutils_log.set_threshold(distutils_log.WARN)  # type: ignore[attr-defined]
+            distutils_log.set_threshold(distutils_log.WARN)
         try:
             yield hide_listing
         finally:
-            distutils_log.set_threshold(old_threshold)  # type: ignore[attr-defined]
+            distutils_log.set_threshold(old_threshold)
 
 
-def parse_manifestin(template: str) -> List[str]:
+def parse_manifestin(template: str) -> list[str]:
     """This function parses template file (usually MANIFEST.in)"""
     if not os.path.exists(template):
         return []
@@ -250,8 +267,8 @@ def parse_manifestin(template: str) -> List[str]:
             # malformed lines, or a ValueError from the lower-level
             # convert_path function
             except (DistutilsTemplateError, ValueError) as msg:
-                filename = template_file.filename if hasattr(template_file, "filename") else "Unknown"  # type: ignore[attr-defined]
-                current_line = template_file.current_line if hasattr(template_file, "current_line") else "Unknown"  # type: ignore[attr-defined]
+                filename = template_file.filename if hasattr(template_file, "filename") else "Unknown"
+                current_line = template_file.current_line if hasattr(template_file, "current_line") else "Unknown"
                 print(f"{filename}, line {current_line}: {msg}", flush=True)
         return file_list.files
     finally:

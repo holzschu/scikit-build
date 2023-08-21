@@ -1,13 +1,14 @@
 """This module defines custom implementation of ``build_py`` setuptools
 command."""
 
+from __future__ import annotations
+
 import os
-from typing import Dict, List, Tuple, Union
 
 from setuptools.command.build_py import build_py as _build_py
 
 from ..constants import CMAKE_INSTALL_DIR
-from ..utils import distribution_hide_listing, distutils_log
+from ..utils import distribution_hide_listing, logger
 from . import set_build_base_mixin
 
 
@@ -22,7 +23,7 @@ class build_py(set_build_base_mixin, _build_py):
         super().initialize_options()
         self.outfiles_count = 0
 
-    def build_module(self, module: Union[str, List[str], Tuple[str, ...]], module_file: str, package: str) -> None:
+    def build_module(self, module: str | list[str] | tuple[str, ...], module_file: str, package: str) -> None:
         """Handle --hide-listing option.
 
         Increments ``outfiles_count``.
@@ -38,9 +39,9 @@ class build_py(set_build_base_mixin, _build_py):
         """
         with distribution_hide_listing(self.distribution):
             super().run(*args, **kwargs)
-        distutils_log.info("copied %d files", self.outfiles_count)
+        logger.info("copied %d files", self.outfiles_count)
 
-    def find_modules(self) -> List[Tuple[str, str, str]]:
+    def find_modules(self) -> list[tuple[str, str, str]]:
         """Finds individually-specified Python modules, ie. those listed by
         module name in 'self.py_modules'.  Returns a list of tuples (package,
         module_base, filename): 'package' is a tuple of the path through
@@ -55,10 +56,10 @@ class build_py(set_build_base_mixin, _build_py):
         #   this package
         # checked - true if we have checked that the package directory
         #   is valid (exists, contains __init__.py, ... ?)
-        packages: Dict[str, Tuple[str, bool]] = {}
+        packages: dict[str, tuple[str, bool]] = {}
 
         # List of (package, module, filename) tuples to return
-        modules: List[Tuple[str, str, str]] = []
+        modules: list[tuple[str, str, str]] = []
 
         # We treat modules-in-packages almost the same as toplevel modules,
         # just the "package" for a toplevel is empty (either an empty

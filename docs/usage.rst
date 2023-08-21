@@ -20,19 +20,31 @@ Basic Usage
 
 Example of setup.py, CMakeLists.txt and pyproject.toml
 ------------------------------------------------------
+The full example code is `Here <https://github.com/scikit-build/scikit-build-sample-projects/tree/master/projects/hello-cpp>`_
 
-To use scikit-build in a project, place the following in your project's
+Make a fold name my_project as your project root folder, place the following in your project's
 ``setup.py`` file::
 
     from skbuild import setup  # This line replaces 'from setuptools import setup'
+    setup(
+        name="hello-cpp",
+        version="1.2.3",
+        description="a minimal example package (cpp version)",
+        author='The scikit-build team',
+        license="MIT",
+        packages=['hello'],
+        python_requires=">=3.7",
+    )
 
 Your project now uses scikit-build instead of setuptools.
 
 Next, add a ``CMakeLists.txt`` to describe how to build your extension. In the following example,
 a C++ extension named ``_hello`` is built::
 
-    cmake_minimum_required(VERSION 3.11.0)
+    cmake_minimum_required(VERSION 3.18...3.22)
+
     project(hello)
+
     find_package(PythonExtensions REQUIRED)
 
     add_library(_hello MODULE hello/_hello.cxx)
@@ -43,13 +55,32 @@ Then, add a ``pyproject.toml`` to list the build system requirements::
 
     [build-system]
     requires = [
-      "setuptools>=42",
-      "scikit-build",
-      "cmake",
-      "ninja; platform_system!='Windows'"
+        "setuptools>=42",
+        "scikit-build>=0.13",
+        "cmake>=3.18",
+        "ninja",
     ]
     build-backend = "setuptools.build_meta"
 
+Make a hello folder inside my_project folder and place `_hello.cxx <https://github.com/scikit-build/scikit-build-sample-projects/blob/8fdbc8a0dd78656ea0b431e005b49f3e19786444/projects/hello-cpp/hello/_hello.cxx>`_ and `__init__.py <https://github.com/scikit-build/scikit-build-sample-projects/blob/8fdbc8a0dd78656ea0b431e005b49f3e19786444/projects/hello-cpp/hello/__init__.py>`_ inside hello folder.
+
+Now every thing is ready, go to my_project's parent folder and type following command to install your extension::
+
+    pip install my_project/.
+
+If you want to see the detail of installation::
+
+    pip install my_project/. -v
+
+Try your new extension::
+
+    $ python
+    Python 3.10.4 (main, Jun 29 2022, 12:14:53) [GCC 11.2.0] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import hello
+    >>> hello.hello("scikit-build")
+    Hello, scikit-build!
+    >>>
 
 You can add lower limits to ``cmake`` or ``scikit-build`` as needed. Ninja
 should be limited to non-Windows systems, as MSVC 2017+ ships with Ninja
@@ -84,7 +115,9 @@ be placed in ``setup.cfg`` as normal.
 
 - ``include_package_data``: If set to ``True``, this tells setuptools to automatically include any data files it finds
   inside your package directories that are specified by your ``MANIFEST.in`` file. For more information, see the setuptools
-  documentation section on `Including Data Files`_.
+  documentation section on `Including Data Files`_. scikit-build matches
+  `the setuptools behavior <https://setuptools.pypa.io/en/latest/history.html#id255>`__ of defaulting this parameter to
+  ``True`` if a pyproject.toml file exists and contains either the ``project`` or ``tool.setuptools`` table.
 
 - ``package_data``: A dictionary mapping package names to lists of glob patterns. For a complete description and examples,
   see the setuptools documentation section on `Including Data Files`_.
@@ -106,7 +139,9 @@ be placed in ``setup.cfg`` as normal.
 - ``entry_points``: A dictionary mapping entry point group names to strings or lists of strings defining the entry points.
   Entry points are used to support dynamic discovery of services or plugins provided by a project.
   See `Dynamic Discovery of Services and Plugins`_ for details and examples of the format of this argument. In addition,
-  this keyword is used to support `Automatic Script Creation`_.
+  this keyword is used to support `Automatic Script Creation`_. Note that if using ``pyproject.toml`` for configuration,
+  the requirement to put ``entry_points`` in ``setup.py`` also requires that the ``project`` section include ``entry_points``
+  in the ``dynamic`` section.
 
 - ``scripts``: List of python script relative paths. If the first line of the script starts with ``#!`` and contains the
   word ``python``, the Distutils will adjust the first line to refer to the current interpreter location.
@@ -155,7 +190,7 @@ For example::
 - ``cmake_source_dir``: Relative directory containing the project ``CMakeLists.txt``.
   By default, it is set to the top-level directory where ``setup.py`` is found.
 
-- ``cmake_process_manifest_hook``: Python function consumming the list of files to be
+- ``cmake_process_manifest_hook``: Python function consuming the list of files to be
   installed produced by cmake. For example, ``cmake_process_manifest_hook`` can be used
   to exclude static libraries from the built wheel.
 
@@ -214,6 +249,9 @@ Scikit-build changes the following options:
 
 Command line options
 --------------------
+
+Warning: Passing options to ``setup.py`` is deprecated and may be removed in a
+future release. Environment variables can be used instead for most options.
 
 ::
 
@@ -291,7 +329,6 @@ scikit-build options
       -G , --generator   specify the CMake build system generator
       -j N               allow N build jobs at once
       [...]
-
 
 .. versionadded:: 0.7.0
 
@@ -396,7 +433,7 @@ then you can implement a thin wrapper around ``build_meta`` in the ``_custom_bui
     build_sdist = _orig.build_sdist
     get_requires_for_build_sdist = _orig.get_requires_for_build_sdist
 
-    def get_requires_for_build_wheel(self, config_settings=None):
+    def get_requires_for_build_wheel(config_settings=None):
         from packaging import version
         from skbuild.exceptions import SKBuildError
         from skbuild.cmaker import get_cmake_version
@@ -409,6 +446,8 @@ then you can implement a thin wrapper around ``build_meta`` in the ``_custom_bui
 
         return _orig.get_requires_for_build_wheel(config_settings) + packages
 
+Also see `scikit-build-core <https://scikit-build-core.readthedocs.io>`_ where
+this is a built-in feature.
 
 .. _usage_enabling_parallel_build:
 
@@ -460,7 +499,7 @@ For example, to limit the number of parallel jobs to ``3``, the following could 
 Visual Studio IDE
 ^^^^^^^^^^^^^^^^^
 
-If :ref:`Visual Studio` generator is used, there are two types of parallelism:
+If :ref:`Visual Studio IDE` generator is used, there are two types of parallelism:
 
 * target level parallelism
 * object level parallelism

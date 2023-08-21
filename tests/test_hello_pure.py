@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-
 """test_hello_pure
 ----------------------------------
 
 Tries to build and test the `hello-pure` sample project.
 """
+
+from __future__ import annotations
 
 import glob
 
@@ -19,11 +19,6 @@ from .pytest_helpers import check_sdist_content, check_wheel_content
 def test_hello_pure_builds(capsys):
     out, _ = capsys.readouterr()
     assert "skipping skbuild (no CMakeLists.txt found)" in out
-
-
-# @project_setup_py_test("hello-pure", ["test"])
-# def test_hello_cython_works():
-#     pass
 
 
 @project_setup_py_test("hello-pure", ["sdist"], disable_languages_test=True)
@@ -58,7 +53,7 @@ def test_hello_pure_wheel():
 def test_hello_clean(capfd):
     with push_dir():
 
-        @project_setup_py_test("hello-pure", ["build"], disable_languages_test=True)
+        @project_setup_py_test("hello-pure", ["build"], disable_languages_test=True, ret=True)
         def run_build():
             pass
 

@@ -1,14 +1,15 @@
 """This modules implements the logic allowing to instantiate the expected
 :class:`.abstract.CMakePlatform`."""
 
-# pylint: disable=import-outside-toplevel
+from __future__ import annotations
 
+# pylint: disable=import-outside-toplevel
 import platform
 
 from . import abstract
 
 
-def get_platform() -> "abstract.CMakePlatform":
+def get_platform() -> abstract.CMakePlatform:
     """Return an instance of :class:`.abstract.CMakePlatform` corresponding
     to the current platform."""
     this_platform = platform.system().lower()
@@ -18,7 +19,8 @@ def get_platform() -> "abstract.CMakePlatform":
 
         return windows.WindowsPlatform()
 
-    if this_platform == "linux":
+    # Some flexibility based on what emcripten distros decide to call themselves
+    if this_platform.startswith(("linux", "emscripten", "pyodide")):
         from . import linux
 
         return linux.LinuxPlatform()
@@ -33,10 +35,20 @@ def get_platform() -> "abstract.CMakePlatform":
 
         return osx.OSXPlatform()
 
-    if this_platform in {"freebsd", "os400", "openbsd"}:
+    if this_platform in {"freebsd", "netbsd", "os400", "openbsd"}:
         from . import bsd
 
         return bsd.BSDPlatform()
+
+    if this_platform == "sunos":
+        from . import sunos
+
+        return sunos.SunOSPlatform()
+
+    if this_platform == "aix":
+        from . import aix
+
+        return aix.AIXPlatform()
 
     msg = f"Unsupported platform: {this_platform:s}. Please contact the scikit-build team."
     raise RuntimeError(msg)

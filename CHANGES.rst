@@ -3,13 +3,227 @@ Release Notes
 =============
 
 This is the list of changes to scikit-build between each release. For full
-details, see the commit logs at http://github.com/scikit-build/scikit-build
+details, see the commit logs at https://github.com/scikit-build/scikit-build
 
 Next Release
 ============
 
-We are hard at work on the next generation of scikit-build. We are also
-continuing to fix bugs, make improvements, and backport changes here.
+We are hard at work on the next generation of scikit-build `scikit-build-core
+<https://github.com/scikit-build/scikit-build-core>`_, which will eventually
+replace the backend here. We are also continuing to fix bugs, make improvements,
+and backport changes here.
+
+.. START-BRIEF-CHANGELOG
+
+
+Scikit-build 0.17.6
+===================
+
+A small fix release with some new platforms and better testing, including CPython 3.12.0b1.
+
+Bug fixes
+---------
+
+* Support added for SunOS by :user:`mtelka` in :pr:`983`.
+* Support added for AIX (with recent CMake) by :user:`bhuntsman` in :pr:`988`.
+
+Testing
+-------
+
+* Tests now pass on CPython 3.12.0b1 in :pr:`879`.
+* Tests no longer use ``pytest-virtualenv`` in :pr:`879`.
+* ``isolated`` marker now includes ``test_distribution`` tests in :pr:`879`.
+* Tests avoid incorrect ``get_map`` match by :user:`keszybz` in :pr:`990`.
+* Fedora testing fix by :user:`LecrisUT` in :pr:`986` and :pr:`938`.
+
+Miscellaneous
+-------------
+
+* Docs improvements in :pr:`979`.
+
+Scikit-build 0.17.5
+===================
+
+A small fix release fixing the passing on of generator specific arguments. This
+fixes some cases where the Ninja generator was found but then was unable to
+build. NetBSD was reported to work, so was added to the BSD's supported.
+
+Bug fixes
+---------
+
+* Generator args were missing for actual compile in :pr:`975`.
+* Add support for netbsd & pyodide (future) in :pr:`977`.
+
+
+
+Scikit-build 0.17.4
+===================
+
+A followup fix to the issue 0.17.3 tried to fix. We now have a method to
+manually test downstream packages, too.
+
+Bug fixes
+---------
+
+* Make sure include dir is found even if the lib is not present in :pr:`974`.
+
+Scikit-build 0.17.3
+===================
+
+A small release related to ``PYTHON_LIBRARY`` handling changes in 0.17.2;
+scikit-build 0.17.3 returns an empty string from ``get_python_library`` if no
+Python library is present (like on manylinux), where 0.17.2 returned None, and
+previous versions returned a non-existent path. Note that adding ``REQUIRED``
+to ``find_package(PythonLibs`` will fail, but it is incorrect (you must not
+link to ``libPython.so``) and was really just injecting a non-existent path
+before.
+
+Bug fixes
+---------
+
+* Keep ``get_python_library``  return type string if python lib non-existing
+  for now in :pr:`959`.
+* Avoid 'not found' warning if libs are not found by FindPythonExtensions in :pr:`960`.
+* FindNumPy should not call FindPythonLibs in :pr:`958`.
+
+Scikit-build 0.17.2
+===================
+
+Another small release with fixes for non-MSVC Windows platforms.
+
+Bug fixes
+---------
+
+* RPM spec fix by :user:`LecrisUT` in :pr:`937`.
+* Validate value before returning library path by :user:`dlech` in :pr:`942`.
+* Only add ``Python_LIBRARY`` on Windows MSVC in :pr:`943` and :pr:`944`.
+* Slightly nicer traceback for failed compiler in :pr:`947`.
+
+Testing
+-------
+* Hide a few warnings that are expected in :pr:`948`.
+
+Scikit-build 0.17.1
+===================
+
+This is a small release fixing a few bugs; the primary one being a change that
+was triggering a bug in older FindPython. The unused variable messages have
+been deactivated to simplify output, as well.
+
+Bug fixes
+---------
+
+* Older (<3.24) CMake breaks when lib specified in :pr:`932`.
+* An error output was missing formatting in :pr:`931`.
+* Make empty ``CMAKE_OSX_DEPLOYMENT_TARGET`` a warning (bug in conda-forge's
+  clang activation fixed upstream) in :pr:`934`.
+* Remove unused variable warnings by in :pr:`930`.
+
+Testing
+-------
+
+* Add Fedora packaging with packit automation by :user:`LecrisUT` in :pr:`928`.
+* Fix codecov ci by :user:`LecrisUT` in :pr:`929`.
+* Update some coverage settings in :pr:`933`.
+
+
+
+Scikit-build 0.17.0
+===================
+
+A lot of bug fixes are present in this release, focusing on Windows, PyPy, and
+cross compiling. We've also improved the compatibility with default setuptools
+behaviors a little, and enabled some things that were previously unavailable,
+like overriding the build type via the cmake argument environment variables.
+We've expanded our CI matrix to include Windows and macOS PyPy and some Fortran
+tests on Linux. This release requires Python 3.7+.
+
+Bug fixes
+---------
+
+* Match setuptools behavior for ``include_package_data`` default. by :user:`vyasr` in :pr:`873`.
+* Misc. fixes for F2PY and PythonExtensions modules by :user:`benbovy` in :pr:`495`.
+* Provide more useful error if user provides ``CMAKE_INSTALL_PREFIX`` by :user:`vyasr` in :pr:`872`.
+* Stop assuming that ``.pyx`` files are in the same directory as ``CMakeLists.txt`` by :user:`vyasr` in :pr:`871`.
+* Allow build type overriding in :pr:`902`.
+* Detect PyPy library correctly on Windows by user:`gershnik` in :pr:`904`.
+* Include library for FindPython for better Windows cross-compiles in :pr:`913`. Thanks to user:`maxbachmann` for testing.
+* Fix logic for default generator when cross-compiling for ARM on Windows in :pr:`917` by :user:`dlech`.
+* Use f2py's ``get_include`` if present in :pr:`877`.
+* Fix support for cross-compilation exception using ``targetLinkLibrariesWithDynamicLookup`` by :user:`erykoff` in :pr:`901`.
+* Treat empty ``MACOSX_DEPLOYMENT_TARGET`` as if it was unset in :pr:`918`.
+
+Testing
+-------
+
+* Add hello fortran sample package + tests by :user:`benbovy` in :pr:`493`.
+* Add sdist check & fix in :pr:`906`.
+* Fix some setuptools types in :pr:`888`.
+* Add PyPy Win & macOS to the CI in :pr:`907`.
+* Add tests for Python 3.12 Linux alphas in :pr:`922`.
+
+Miscellaneous
+-------------
+
+* Drop Python 3.6 in :pr:`862`.
+* Move building backend to hatchling in :pr:`870`.
+* Avoid mutating function input parameters in :pr:`899`.
+* Use _compat/typing name in :pr:`869`.
+
+.. END-BRIEF-CHANGELOG
+
+Scikit-build 0.16.7
+===================
+
+This is expected to be the final release series supporting Python 3.6. 0.17 will require Python 3.7+ and start removing deprecated functionality.
+
+* Added ``SKBUILD_GNU_SKIP_LOCAL_SYMBOL_EXPORT_OVERRIDE`` to disable script in :pr:`848`, thanks to :user:`aaron-bray` and :user:`vyasr`.
+* Address a new warning from setuptools in our test suite in :pr:`859`.
+* Move to using Ruff, update to Black 23, and use Flynt to move more code to f-strings.
+
+
+Scikit-build 0.16.6
+===================
+
+* Fix a discovery regression in 0.16.5 when a ``cmake`` folder or ``cmake.py`` was present in :pr:`848`.
+* Correct an issue in the tests where a generator wasn't expanded into a list in :pr:`850`.
+
+
+Scikit-build 0.16.5
+===================
+
+* Use cmake module if installed over system installs in :pr:`839`.
+* Support setting of ``-DCMAKE_SYSTEM_PROCESSOR`` if passed for selecting an arch, useful for cross compiling on conda-forge in :pr:`843`.
+* Fixed a rare encoded error output string on Windows in :pr:`842`.
+* Better granularity in extras in :pr:`838`.
+* Add test markers for nosetuptoolsscm and isolated (helpful for package distributions building scikit-build itself like conda) in :pr:`837`.
+
+
+Scikit-build 0.16.4
+===================
+
+This releases backports additions for Windows ARM cross-compiling via
+cibuildwheel from scikit-build-core 0.1.4.
+
+* Initial experimental support for Windows ARM cross-compile in :pr:`824` and :pr:`818`
+* Replace mailing list with GitHub Discussions board in :pr:`823`
+* Some CI updates in :pr:`811` and :pr:`812`
+
+
+Scikit-build 0.16.3
+===================
+
+This release fixes logging issues using setuptools 65.6+ affecting our tests.
+Pytest 7.2+ is now supported. ``setup.py <command>`` and ``setup_requires``
+are deprecated, and tests are marked as such.
+
+
+* Fix typo in usage.rst in :pr:`795`, thanks to :user:`chohner`.
+* Support pytest 7.2+ in :pr:`801`.
+* Change warning filtering in :pr:`802`.
+* Handle logging changes in setuptools 65.6+ in :pr:`807`.
+* Add deprecated markers to some tests in :pr:`807`.
+* Allow known warnings to show up in the tests :pr:`807`.
 
 
 Scikit-build 0.16.2
@@ -58,6 +272,13 @@ Bug fixes
 * FindPython mode uses a new path specification, should help make it usable. :pr:`774`
 
 * Better flushing and output streams for more consistent output ordering. :pr:`781`
+
+Documentation
+-------------
+
+* scikit-build mailing list transitioned to the `scikit-build GitHub Discussions board <https://github.com/orgs/scikit-build/discussions>`_. See :issue:`800`.
+  * Transitioning away from the mailing list and adopting the GitHub Discussions will provide a more integrated platform enabling us to more effectively engage with the community.
+  * After sending a `last message <https://groups.google.com/g/scikit-build/c/jU7-EvvMPb8>`_ describing the transition, the mailing list was updated to be read-only and the welcome message was updated to redirect visitor toward the Discussions board.
 
 Scikit-build 0.15.0
 ===================
@@ -356,7 +577,7 @@ Bug fixes
 Documentation
 -------------
 
-* Add :doc:`/notes` section to the ``For maintainers`` top-level category that includes a comparison between
+* Add notes section to the ``For maintainers`` top-level category that includes a comparison between
   ``sysconfig`` and ``distutils.sysconfig`` modules.
 
 * Remove obsolete comment in ``cmaker.py``. See :issue:`439`. Thanks :user:`isuruf`
@@ -364,7 +585,7 @@ Documentation
 Tests
 -----
 
-* Update :func:`initialize_git_repo_and_commit` to prevent signing message on system with commit signing
+* Update ``initialize_git_repo_and_commit`` to prevent signing message on system with commit signing
   enabled globally.
 
 Scikit-build 0.10.0
@@ -396,7 +617,7 @@ Bug fixes
 Internal API
 ------------
 
-* Add :meth:`skbuild.platforms.windows.find_visual_studio`.
+* Add :func:`skbuild.platform_specifics.windows.find_visual_studio`.
 
 Documentation
 -------------
@@ -768,7 +989,7 @@ Documentation
 
 * Add a command line :ref:`CMake Options <usage_cmake_options>` section to :doc:`Usage <\usage>`.
 
-* Fix :ref:`table <Visual Studio>` listing *Visual Studio IDE* version and
+* Fix :ref:`table <Visual Studio IDE>` listing *Visual Studio IDE* version and
   corresponding with *CPython version* in :doc:`/generators`.
 
 * Improve :doc:`/make_a_release` section.
@@ -792,7 +1013,7 @@ Internal API
 * Teach :class:`skbuild.utils.PythonModuleFinder` to search for ``python module``
   in the CMake install tree.
 
-* Update :meth:`skbuild.setuptools_wrap._consolidate` to copy file into the CMake
+* Update :func:`skbuild.setuptools_wrap._consolidate` to copy file into the CMake
   tree only if it exists.
 
 * Update :meth:`skbuild.setuptools_wrap._copy_file` to create directory only if
@@ -858,7 +1079,7 @@ Documentation
 
 * add :doc:`/generators` section
 
-* add :doc:`/changes` section
+* add :doc:`/history` section
 
 * allow github issues and users to easily be referenced using ``:issue:`XY```
   and ``:user:`username``` markups.
@@ -977,8 +1198,7 @@ Tests
 
 * Simplify continuous integration
 
- * use `scikit-ci <http://scikit-ci.readthedocs.io/en/latest/>`_ and
-   `scikit-ci-addons`_
+ * use `scikit-ci`_ and `scikit-ci-addons`_
  * speed up build setting up caching
 
 * Makefile:

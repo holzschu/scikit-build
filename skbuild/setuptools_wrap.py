@@ -3,6 +3,8 @@ from distutils and setuptools.
 """
 
 
+from __future__ import annotations
+
 import argparse
 import contextlib
 import copy
@@ -16,19 +18,7 @@ import shutil
 import stat
 import sys
 import warnings
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Callable, Generator, Mapping, Sequence
 
 import setuptools
 from distutils.errors import DistutilsArgError, DistutilsError, DistutilsGetoptError
@@ -37,6 +27,7 @@ from packaging.version import parse as parse_version
 from setuptools.dist import Distribution as upstream_Distribution
 
 from . import cmaker
+from ._compat import tomllib
 from .command import (
     bdist,
     bdist_wheel,
@@ -50,7 +41,6 @@ from .command import (
     install_lib,
     install_scripts,
     sdist,
-    test,
 )
 from .constants import (
     CMAKE_DEFAULT_EXECUTABLE,
@@ -77,7 +67,7 @@ def create_skbuild_argparser() -> argparse.ArgumentParser:
     """Create and return a scikit-build argument parser."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
-        "--build-type", default="Release", metavar="", help="specify the CMake build type (e.g. Debug or Release)"
+        "--build-type", default=None, metavar="", help="specify the CMake build type (e.g. Debug or Release)"
     )
     parser.add_argument("-G", "--generator", metavar="", help="specify the CMake build system generator")
     parser.add_argument("-j", metavar="N", type=int, dest="jobs", help="allow N build jobs at once")
@@ -86,7 +76,7 @@ def create_skbuild_argparser() -> argparse.ArgumentParser:
         "--install-target",
         default=None,
         metavar="",
-        help="specify the CMake target performing the install. " "If not provided, uses the target ``install``",
+        help="specify the CMake target performing the install. If not provided, uses the target ``install``",
     )
     parser.add_argument(
         "--skip-generator-test",
@@ -99,18 +89,12 @@ def create_skbuild_argparser() -> argparse.ArgumentParser:
 def _is_cmake_configure_argument(arg: str) -> bool:
     """Return True if ``arg`` is a relevant argument to pass to cmake when configuring a project."""
 
-    for cmake_arg in (
-        "-C",  # initial-cache
-        "-D",  # <var>[:<type>]=<value>
-    ):
-        if arg.startswith(cmake_arg):
-            return True
-    return False
+    return any(arg.startswith(cmake_arg) for cmake_arg in ("-C", "-D"))
 
 
 def parse_skbuild_args(
-    args: Sequence[str], cmake_args: List[str], build_tool_args: List[str]
-) -> Tuple[List[str], Optional[str], bool]:
+    args: Sequence[str], cmake_args: Sequence[str], build_tool_args: Sequence[str]
+) -> tuple[list[str], str | None, bool, list[str], list[str]]:
     """
     Parse arguments in the scikit-build argument set. Convert specified
     arguments to proper format and append to cmake_args and build_tool_args.
@@ -119,37 +103,40 @@ def parse_skbuild_args(
     parser = create_skbuild_argparser()
 
     # Consider CMake arguments passed as global setuptools options
-    cmake_args.extend([arg for arg in args if _is_cmake_configure_argument(arg)])
+    _cmake_args = [*cmake_args, *(arg for arg in args if _is_cmake_configure_argument(arg))]
     # ... and remove them from the list
-    args = [arg for arg in args if not _is_cmake_configure_argument(arg)]
+    _args = [arg for arg in args if not _is_cmake_configure_argument(arg)]
+    _build_tool_args = list(build_tool_args)
 
-    namespace, remaining_args = parser.parse_known_args(args)
+    namespace, remaining_args = parser.parse_known_args(_args)
 
     # Construct CMake argument list
-    cmake_args.append("-DCMAKE_BUILD_TYPE:STRING=" + namespace.build_type)
+    if namespace.build_type is not None:
+        _cmake_args.append("-DCMAKE_BUILD_TYPE:STRING=" + namespace.build_type)
     if namespace.generator is not None:
-        cmake_args.extend(["-G", namespace.generator])
+        _cmake_args.extend(["-G", namespace.generator])
 
     # Construct build tool argument list
-    build_tool_args.extend(["--config", namespace.build_type])
     if namespace.jobs is not None:
-        build_tool_args.extend(["-j", str(namespace.jobs)])
+        _build_tool_args.extend(["-j", str(namespace.jobs)])
     if namespace.install_target is not None:
-        build_tool_args.extend(["--install-target", namespace.install_target])
+        _build_tool_args.extend(["--install-target", namespace.install_target])
 
     if namespace.generator is None and namespace.skip_generator_test is True:
         sys.exit("ERROR: Specifying --skip-generator-test requires --generator to also be specified.")
 
-    return remaining_args, namespace.cmake_executable, namespace.skip_generator_test
+    return remaining_args, namespace.cmake_executable, namespace.skip_generator_test, _cmake_args, _build_tool_args
 
 
-def parse_args() -> Tuple[List[str], Optional[str], bool, List[str], List[str]]:
+def parse_args() -> tuple[list[str], str | None, bool, list[str], list[str]]:
     """This function parses the command-line arguments ``sys.argv`` and returns
     the tuple ``(setuptools_args, cmake_executable, skip_generator_test, cmake_args, build_tool_args)``
     where each ``*_args`` element corresponds to a set of arguments separated by ``--``."""
-    dutils: List[str] = []
-    cmake: List[str] = []
-    make: List[str] = []
+
+    dutils: list[str] = []
+    cmake: list[str] = []
+    make: list[str] = []
+
     argsets = [dutils, cmake, make]
     i = 0
     separator = "--"
@@ -158,23 +145,22 @@ def parse_args() -> Tuple[List[str], Optional[str], bool, List[str], List[str]]:
         if arg == separator:
             i += 1
             if i >= len(argsets):
-                sys.exit(f"ERROR: Too many '{separator}' separators provided (expected at most {len(argsets) - 1}).")
+                sys.exit(f"ERROR: Too many {separator!r} separators provided (expected at most {len(argsets) - 1}).")
         else:
             argsets[i].append(arg)
 
-    dutils, cmake_executable, skip_generator_test = parse_skbuild_args(dutils, cmake, make)
+    dutils, cmake_executable, skip_generator_test, cmake, make = parse_skbuild_args(dutils, cmake, make)
 
     return dutils, cmake_executable, skip_generator_test, cmake, make
 
 
 @contextlib.contextmanager
-def _capture_output() -> Generator[List[Union[io.StringIO, str]], None, None]:
-    out: List[Union[io.StringIO, str]]
+def _capture_output() -> Generator[list[io.StringIO | str], None, None]:
+    out: list[io.StringIO | str]
 
-    with contextlib.redirect_stdout(io.StringIO()) as stdout:
-        with contextlib.redirect_stderr(io.StringIO()) as stderr:
-            out = [stdout, stderr]
-            yield out
+    with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.redirect_stderr(io.StringIO()) as stderr:
+        out = [stdout, stderr]
+        yield out
 
     assert isinstance(out[0], io.StringIO)
     assert isinstance(out[1], io.StringIO)
@@ -184,7 +170,7 @@ def _capture_output() -> Generator[List[Union[io.StringIO, str]], None, None]:
 
 def _parse_setuptools_arguments(
     setup_attrs: Mapping[str, Any]
-) -> Tuple[bool, bool, List[str], bool, bool, bool, str, bool]:
+) -> tuple[bool, bool, list[str], bool, bool, bool, str, bool]:
     """This function instantiates a Distribution object and
     parses the command line arguments.
 
@@ -221,7 +207,7 @@ def _parse_setuptools_arguments(
 
     # Update class attribute to also ensure the argument is processed
     # when ``setuptools.setup`` is called.
-    upstream_Distribution.global_options.extend(  # type: ignore[attr-defined]
+    upstream_Distribution.global_options.extend(
         [
             ("hide-listing", None, "do not display list of files being included in the distribution"),
             ("force-cmake", None, "always run CMake"),
@@ -238,7 +224,7 @@ def _parse_setuptools_arguments(
     # SystemExit to suppress tracebacks.
 
     with _capture_output():
-        result = dist.parse_command_line()  # type: ignore[attr-defined]
+        result = dist.parse_command_line()  # type: ignore[no-untyped-call]
         display_only = not result
         if not hasattr(dist, "hide_listing"):
             dist.hide_listing = False  # type: ignore[attr-defined]
@@ -248,7 +234,7 @@ def _parse_setuptools_arguments(
             dist.skip_cmake = False  # type: ignore[attr-defined]
 
     plat_names = set()
-    for cmd in [dist.get_command_obj(command) for command in dist.commands]:  # type: ignore[attr-defined]
+    for cmd in [dist.get_command_obj(command) for command in dist.commands]:
         plat_name = getattr(cmd, "plat_name", None)
         if plat_name is not None:
             plat_names.add(plat_name)
@@ -258,7 +244,7 @@ def _parse_setuptools_arguments(
         names = ", ".join(plat_names)
         msg = f"--plat-name is ambiguous: {names}"
         raise SKBuildError(msg)
-    plat_name = list(plat_names)[0]
+    plat_name = next(iter(plat_names))
 
     build_ext_cmd = dist.get_command_obj("build_ext")
     build_ext_inplace: bool = getattr(build_ext_cmd, "inplace", False)
@@ -266,7 +252,7 @@ def _parse_setuptools_arguments(
     return (
         display_only,
         dist.help_commands,  # type: ignore[attr-defined]
-        dist.commands,  # type: ignore[attr-defined]
+        dist.commands,
         dist.hide_listing,  # type: ignore[attr-defined]
         dist.force_cmake,  # type: ignore[attr-defined]
         dist.skip_cmake,  # type: ignore[attr-defined]
@@ -313,10 +299,10 @@ def strip_package(package_parts: Sequence[str], module_file: str) -> str:
 
     module_dir = module_dir[: len(package)]
 
-    return module_file[len(package) + 1 :] if package != "" and module_dir.startswith(package) else module_file
+    return module_file[len(package) + 1 :] if package and module_dir.startswith(package) else module_file
 
 
-def _package_data_contain_module(module: Tuple[str, str, str], package_data: Mapping[str, List[str]]) -> bool:
+def _package_data_contain_module(module: tuple[str, str, str], package_data: Mapping[str, list[str]]) -> bool:
     """Return True if the ``module`` is contained
     in the ``package_data``.
 
@@ -355,7 +341,6 @@ def _should_run_cmake(commands: Sequence[str], cmake_with_sdist: bool) -> bool:
         "bdist_rpm",
         "bdist_wininst",
         "bdist_wheel",
-        "test",
     }
 
     if expected_commands & given_commands:
@@ -382,19 +367,34 @@ def _load_cmake_spec() -> Any:
     return None
 
 
-# pylint:disable=too-many-locals, too-many-branches
-def setup(  # noqa: C901
+def get_default_include_package_data() -> bool:
+    """
+    Include package data if pyproject.toml contains the project or
+    tool.setuptools table.
+    """
+    # https://setuptools.pypa.io/en/latest/history.html#id255
+    # https://github.com/pypa/setuptools/pull/3067
+    pyproject_file = os.path.join(os.getcwd(), "pyproject.toml")
+    try:
+        with open(pyproject_file, "rb") as f:
+            pyproject = tomllib.load(f)
+        return "project" in pyproject or "setuptools" in pyproject.get("tool", {})
+    except FileNotFoundError:
+        return False
+
+
+def setup(
     *,
     cmake_args: Sequence[str] = (),
     cmake_install_dir: str = "",
     cmake_source_dir: str = "",
     cmake_with_sdist: bool = False,
     cmake_languages: Sequence[str] = ("C", "CXX"),
-    cmake_minimum_required_version: Optional[str] = None,
-    cmake_process_manifest_hook: Optional[Callable[[List[str]], List[str]]] = None,
+    cmake_minimum_required_version: str | None = None,
+    cmake_process_manifest_hook: Callable[[list[str]], list[str]] | None = None,
     cmake_install_target: str = "install",
     **kw: Any,
-) -> None:
+) -> upstream_Distribution:
     """This function wraps setup() so that we can run cmake, make,
     CMake build, then proceed as usual with setuptools, appending the
     CMake-generated output as necessary.
@@ -416,6 +416,12 @@ def setup(  # noqa: C901
                 kw["package_dir"][package] = prefix[:-1]
 
     sys.argv, cmake_executable, skip_generator_test, cmake_args_from_args, make_args = parse_args()
+    if any("CMAKE_INSTALL_PREFIX" in arg for arg in cmake_args_from_args):
+        msg = "CMAKE_INSTALL_PREFIX may not be passed to the scikit-build CLI."
+        raise ValueError(msg)
+    if any("CMAKE_INSTALL_PREFIX" in arg for arg in cmake_args):
+        msg = "CMAKE_INSTALL_PREFIX may not be passed via cmake_args to setup."
+        raise ValueError(msg)
 
     # work around https://bugs.python.org/issue1011113
     # (patches provided, but no updates since 2014)
@@ -434,7 +440,6 @@ def setup(  # noqa: C901
     cmdclass["generate_source_manifest"] = cmdclass.get(
         "generate_source_manifest", generate_source_manifest.generate_source_manifest
     )
-    cmdclass["test"] = cmdclass.get("test", test.test)
     kw["cmdclass"] = cmdclass
 
     # Extract setup keywords specific to scikit-build and remove them from kw.
@@ -451,7 +456,7 @@ def setup(  # noqa: C901
         print("Traceback (most recent call last):", file=sys.stderr)
         traceback.print_tb(sys.exc_info()[2])
         print(file=sys.stderr, flush=True)
-        sys.exit(ex)
+        sys.exit(ex)  # type: ignore[arg-type]
 
     # Convert source dir to a path relative to the root
     # of the project
@@ -468,7 +473,7 @@ def setup(  # noqa: C901
     # * no CMakeLists.txt if found
     display_only = has_invalid_arguments = help_commands = False
     force_cmake = skip_cmake = False
-    commands: List[str] = []
+    commands: list[str] = []
     try:
         (
             display_only,
@@ -501,12 +506,12 @@ def setup(  # noqa: C901
             print("scikit-build options:")
             print("\n".join(arg_descriptions))
             print()
-            print('Arguments following a "--" are passed directly to CMake ' "(e.g. -DMY_VAR:BOOL=TRUE).")
-            print('Arguments following a second "--" are passed directly to ' " the build tool.")
+            print('Arguments following a "--" are passed directly to CMake (e.g. -DMY_VAR:BOOL=TRUE).')
+            print('Arguments following a second "--" are passed directly to the build tool.')
             print(flush=True)
-        return setuptools.setup(**kw)
+        return setuptools.setup(**kw)  # type: ignore[no-any-return, func-returns-value]
 
-    developer_mode = "develop" in commands or "test" in commands or build_ext_inplace
+    developer_mode = "develop" in commands or build_ext_inplace
 
     packages = kw.get("packages", [])
     package_dir = kw.get("package_dir", {})
@@ -519,11 +524,6 @@ def setup(  # noqa: C901
     new_scripts = {script: False for script in scripts}
 
     data_files = {(parent_dir or "."): set(file_list) for parent_dir, file_list in kw.get("data_files", [])}
-
-    # Since CMake arguments provided through the command line have more
-    # weight and when CMake is given multiple times a argument, only the last
-    # one is considered, let's prepend the one provided in the setup call.
-    cmake_args = list(cmake_args) + cmake_args_from_args
 
     # Handle cmake_install_target
     # get the target (next item after '--install-target') or return '' if no --install-target
@@ -543,11 +543,18 @@ def setup(  # noqa: C901
     env_cmake_args = os.environ["CMAKE_ARGS"].split() if "CMAKE_ARGS" in os.environ else []
     env_cmake_args = [s for s in env_cmake_args if "CMAKE_INSTALL_PREFIX" not in s]
 
-    # Using the environment variable CMAKE_ARGS has lower precedence than manual options
-    cmake_args = env_cmake_args + cmake_args
+    # Since CMake arguments provided through the command line have more weight
+    # and when CMake is given multiple times a argument, only the last one is
+    # considered, let's prepend the one provided in the setup call.
+    #
+    # Using the environment variable CMAKE_ARGS has lower precedence than
+    # manual options.
+    #
+    # The command line arguments to setup.py are deprecated, but they have highest precedence.
+
+    cmake_args = [*env_cmake_args, *cmake_args, *cmake_args_from_args]
 
     if sys.platform == "darwin":
-
         # If no ``--plat-name`` argument was passed, set default value.
         if plat_name is None:
             plat_name = skbuild_plat_name()
@@ -565,11 +572,20 @@ def setup(  # noqa: C901
             # or the ``cmake_args`` setup option.
             for cmake_arg in cmake_args:
                 if "CMAKE_OSX_DEPLOYMENT_TARGET" in cmake_arg:
-                    version = cmake_arg.split("=")[1]
+                    version_arg = cmake_arg.split("=")[1]
+                    if version_arg:
+                        version = version_arg
+                    else:
+                        msg = "CMAKE_OSX_DEPLOYMENT_TARGET should not be empty if specified, ignoring"
+                        warnings.warn(msg, stacklevel=1)
                 if "CMAKE_OSX_ARCHITECTURES" in cmake_arg:
                     machine = cmake_arg.split("=")[1]
                     if set(machine.split(";")) == {"x86_64", "arm64"}:
                         machine = "universal2"
+                elif "CMAKE_SYSTEM_PROCESSOR" in cmake_arg:
+                    machine = cmake_arg.split("=")[1]
+
+            assert machine in {"x86_64", "arm64", "universal2"}, f"macOS arch {machine} not understood"
 
             set_skbuild_plat_name(f"macosx-{version}-{machine}")
 
@@ -605,28 +621,43 @@ def setup(  # noqa: C901
             cmake_args.append("-DIOS=1")  # Build the iOS codebase
             cmake_args.append("-DCMAKE_CROSSCOMPILING=ON")
 
+    # Select correct --config using final CMAKE_BUILD_TYPE
+    for item in cmake_args[::-1]:
+        if item.startswith("-DCMAKE_BUILD_TYPE"):
+            _, config_type = item.split("=")
+            break
+    else:
+        config_type = "Release"
+        cmake_args.append("-DCMAKE_BUILD_TYPE:STRING=Release")
+
+    make_args.extend(["--config", config_type])
+
     # Install cmake if listed in `setup_requires`
     for package in kw.get("setup_requires", []):
         if Requirement(package).name == "cmake":
             setup_requires = [package]
             dist = upstream_Distribution({"setup_requires": setup_requires})
-            dist.fetch_build_eggs(setup_requires)  # type: ignore[no-untyped-call]
+            dist.fetch_build_eggs(setup_requires)
 
-            # Considering packages associated with "setup_requires" keyword are
-            # installed in .eggs subdirectory without honoring setuptools "console_scripts"
-            # entry_points and without settings the expected executable permissions, we are
-            # taking care of it below.
-            import cmake  # pylint: disable=import-outside-toplevel
+            with contextlib.suppress(ImportError):
+                # Considering packages associated with "setup_requires" keyword are
+                # installed in .eggs subdirectory without honoring setuptools "console_scripts"
+                # entry_points and without settings the expected executable permissions, we are
+                # taking care of it below.
 
-            for executable in ("cmake", "cpack", "ctest"):
-                executable = os.path.join(cmake.CMAKE_BIN_DIR, executable)
-                if platform.system().lower() == "windows":
-                    executable += ".exe"
-                st = os.stat(executable)
-                permissions = st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-                os.chmod(executable, permissions)
-            cmake_executable = os.path.join(cmake.CMAKE_BIN_DIR, "cmake")
-            break
+                # A local "cmake" folder can be imported by mistake, keep going if it is
+                # pylint: disable-next=import-outside-toplevel
+                from cmake import CMAKE_BIN_DIR
+
+                for executable_name in ("cmake", "cpack", "ctest"):
+                    executable = os.path.join(CMAKE_BIN_DIR, executable_name)
+                    if platform.system().lower() == "windows":
+                        executable += ".exe"
+                    st = os.stat(executable)
+                    permissions = st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+                    os.chmod(executable, permissions)
+                cmake_executable = os.path.join(CMAKE_BIN_DIR, "cmake")
+                break
 
     # Languages are used to determine a working generator
 
@@ -635,14 +666,15 @@ def setup(  # noqa: C901
             cmake_executable = CMAKE_DEFAULT_EXECUTABLE
         cmkr = cmaker.CMaker(cmake_executable)
         if not skip_cmake:
-            if cmake_minimum_required_version is not None:
-                if parse_version(cmkr.cmake_version) < parse_version(cmake_minimum_required_version):
-                    msg = f"CMake version {cmake_minimum_required_version} or higher is required. CMake version {cmkr.cmake_version} is being used"
-                    raise SKBuildError(msg)
+            if cmake_minimum_required_version is not None and parse_version(cmkr.cmake_version) < parse_version(
+                cmake_minimum_required_version
+            ):
+                msg = f"CMake version {cmake_minimum_required_version} or higher is required. CMake version {cmkr.cmake_version} is being used"
+                raise SKBuildError(msg)
             # Used to confirm that the cmake executable is the same, and that the environment
             # didn't change
             cmake_spec = {
-                "args": [shutil.which(CMAKE_DEFAULT_EXECUTABLE)] + cmake_args,
+                "args": [shutil.which(CMAKE_DEFAULT_EXECUTABLE), *cmake_args],
                 "version": cmkr.cmake_version,
                 "environment": {
                     "PYTHONNOUSERSITE": os.environ.get("PYTHONNOUSERSITE"),
@@ -663,14 +695,14 @@ def setup(  # noqa: C901
                 _save_cmake_spec(cmake_spec)
             cmkr.make(make_args, install_target=cmake_install_target, env=env)
     except SKBuildGeneratorNotFoundError as ex:
-        sys.exit(ex)
+        sys.exit(ex)  # type: ignore[arg-type]
     except SKBuildError as ex:
         import traceback  # pylint: disable=import-outside-toplevel
 
         print("Traceback (most recent call last):", file=sys.stderr)
         traceback.print_tb(sys.exc_info()[2])
         print(file=sys.stderr, flush=True)
-        sys.exit(ex)
+        sys.exit(ex)  # type: ignore[arg-type]
 
     # If needed, set reasonable defaults for package_dir
     for package in packages:
@@ -690,7 +722,8 @@ def setup(  # noqa: C901
         if callable(process_manifest):
             cmake_manifest = process_manifest(cmake_manifest)
         else:
-            raise SKBuildError("The cmake_process_manifest_hook argument should be callable.")
+            msg = "The cmake_process_manifest_hook argument should be callable."
+            raise SKBuildError(msg)
 
     _classify_installed_files(
         cmake_manifest,
@@ -706,7 +739,8 @@ def setup(  # noqa: C901
     )
 
     original_manifestin_data_files = []
-    if kw.get("include_package_data", False):
+
+    if kw.get("include_package_data", get_default_include_package_data()):
         original_manifestin_data_files = parse_manifestin(os.path.join(os.getcwd(), "MANIFEST.in"))
         for path in original_manifestin_data_files:
             _classify_file(
@@ -717,10 +751,10 @@ def setup(  # noqa: C901
         # Copy packages
         for package, package_file_list in package_data.items():
             for package_file in package_file_list:
-                package_file = os.path.join(package_dir[package], package_file)
-                cmake_file = os.path.join(CMAKE_INSTALL_DIR(), package_file)
+                package_path = os.path.join(package_dir[package], package_file)
+                cmake_file = os.path.join(CMAKE_INSTALL_DIR(), package_path)
                 if os.path.exists(cmake_file):
-                    _copy_file(cmake_file, package_file, hide_listing)
+                    _copy_file(cmake_file, package_path, hide_listing)
 
         # Copy modules
         for py_module in py_modules:
@@ -759,19 +793,17 @@ def setup(  # noqa: C901
 
     # Adapted from espdev/ITKPythonInstaller/setup.py.in
     class BinaryDistribution(upstream_Distribution):  # pylint: disable=missing-class-docstring
-        def has_ext_modules(self) -> bool:  # pylint: disable=no-self-use,missing-function-docstring
+        def has_ext_modules(self) -> bool:  # pylint: disable=missing-function-docstring
             return has_cmakelists
 
     kw["distclass"] = BinaryDistribution
 
     print(flush=True)
 
-    return setuptools.setup(**kw)
+    return setuptools.setup(**kw)  # type: ignore[no-any-return, func-returns-value]
 
 
-def _collect_package_prefixes(
-    package_dir: Dict[str, str], packages: List[Union[Any, str]]
-) -> List[Union[Any, Tuple[str, str]]]:
+def _collect_package_prefixes(package_dir: dict[str, str], packages: list[Any | str]) -> list[Any | tuple[str, str]]:
     """
     Collect the list of prefixes for all packages
 
@@ -814,13 +846,13 @@ def _collect_package_prefixes(
 
 def _classify_installed_files(
     install_paths: Sequence[str],
-    package_data: Dict[str, List[str]],
-    package_prefixes: Sequence[Tuple[str, str]],
+    package_data: dict[str, list[str]],
+    package_prefixes: Sequence[tuple[str, str]],
     py_modules: Sequence[str],
-    new_py_modules: Dict[str, bool],
+    new_py_modules: dict[str, bool],
     scripts: Sequence[str],
-    new_scripts: Dict[str, bool],
-    data_files: Dict[Any, Any],
+    new_scripts: dict[str, bool],
+    data_files: dict[Any, Any],
     cmake_source_dir: str,
     _cmake_install_dir: str,
 ) -> None:
@@ -840,22 +872,22 @@ def _classify_installed_files(
             raise SKBuildInvalidFileInstallationError(msg)
 
         # peel off the 'skbuild' prefix
-        path = to_unix_path(os.path.relpath(path, CMAKE_INSTALL_DIR()))
+        unix_path = to_unix_path(os.path.relpath(path, CMAKE_INSTALL_DIR()))
 
         _classify_file(
-            path, package_data, package_prefixes, py_modules, new_py_modules, scripts, new_scripts, data_files
+            unix_path, package_data, package_prefixes, py_modules, new_py_modules, scripts, new_scripts, data_files
         )
 
 
 def _classify_file(
     path: str,
-    package_data: Dict[str, List[str]],
-    package_prefixes: Sequence[Tuple[str, str]],
+    package_data: dict[str, list[str]],
+    package_prefixes: Sequence[tuple[str, str]],
     py_modules: Sequence[str],
-    new_py_modules: Dict[str, bool],
+    new_py_modules: dict[str, bool],
     scripts: Sequence[str],
-    new_scripts: Dict[str, bool],
-    data_files: Dict[str, Set[str]],
+    new_scripts: dict[str, bool],
+    data_files: dict[str, set[str]],
 ) -> None:
     found_package = False
     found_module = False
@@ -916,7 +948,7 @@ def _classify_file(
     file_set.add(os.path.join(CMAKE_INSTALL_DIR(), path))
 
 
-def _copy_file(src_file: str, dest_file: str, hide_listing: Union[bool, int] = True) -> None:
+def _copy_file(src_file: str, dest_file: str, hide_listing: bool | int = True) -> None:
     """Copy ``src_file`` to ``dest_file`` ensuring parent directory exists.
 
     By default, message like `creating directory /path/to/package` and
@@ -926,7 +958,7 @@ def _copy_file(src_file: str, dest_file: str, hide_listing: Union[bool, int] = T
     """
     # Create directory if needed
     dest_dir = os.path.dirname(dest_file)
-    if dest_dir != "" and not os.path.exists(dest_dir):
+    if dest_dir and not os.path.exists(dest_dir):
         if not hide_listing:
             print(f"creating directory {dest_dir}", flush=True)
         mkdir_p(dest_dir)
@@ -940,11 +972,11 @@ def _copy_file(src_file: str, dest_file: str, hide_listing: Union[bool, int] = T
 
 def _consolidate_package_modules(
     cmake_source_dir: str,
-    packages: List[Union[Any, str]],
-    package_dir: Dict[str, str],
-    py_modules: List[Union[Any, str]],
-    package_data: Dict[str, List[str]],
-    hide_listing: Union[bool, int],
+    packages: list[Any | str],
+    package_dir: dict[str, str],
+    py_modules: list[Any | str],
+    package_data: dict[str, list[str]],
+    hide_listing: bool | int,
 ) -> None:
     """This function consolidates packages having modules located in
     both the source tree and the CMake install tree into one location.
@@ -976,13 +1008,13 @@ def _consolidate_package_modules(
         modules = PythonModuleFinder(
             packages, package_dir, py_modules, alternative_build_base=CMAKE_INSTALL_DIR()
         ).find_all_modules()
-    except DistutilsError as msg:
-        raise SystemExit(f"error: {msg}") from None
+    except DistutilsError as err:
+        msg = f"error: {err}"
+        raise SystemExit(msg) from None
 
     print(flush=True)
 
     for entry in modules:
-
         # Check if module file should be copied into the CMake install tree.
         if _package_data_contain_module(entry, package_data):
             continue
@@ -1015,9 +1047,9 @@ def _consolidate_package_modules(
 
 
 def _consolidate_package_data_files(
-    original_package_data: Dict[str, List[str]],
-    package_prefixes: List[Union[Any, Tuple[str, str]]],
-    hide_listing: Union[bool, int],
+    original_package_data: dict[str, list[str]],
+    package_prefixes: list[Any | tuple[str, str]],
+    hide_listing: bool | int,
 ) -> None:
     """This function copies package data files specified using the ``package_data`` keyword
     into :func:`.constants.CMAKE_INSTALL_DIR()`.
